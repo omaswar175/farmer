@@ -5,31 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AgriLink - National Digital Agriculture Portal</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
 
-    <!-- LIVE MARKET TICKER -->
     <div class="ticker-bar">
         <div class="ticker-content">
             📊 Live Mandi Rates: Tomatoes (Pune) ₹22/kg ↑ | Onions (Nashik) ₹25/kg ↓ | Potatoes (Satara) ₹18/kg → | Wheat (Indore) ₹30/kg ↑
         </div>
     </div>
 
-    <!-- MAIN NAVBAR -->
     <header class="navbar">
         <div class="brand">🌱 AgriLink <span>AI</span></div>
         <nav class="nav-links">
             <a href="#home" onclick="showTab('home')">Home</a>
             <a href="#marketplace" onclick="showTab('marketplace')">Marketplace</a>
             <a href="#farmer" onclick="showTab('farmer')">Farmer Portal</a>
-            <a href="#analytics" onclick="showTab('analytics')">AI Analytics</a>
+            <a href="#orders" id="navOrdersTab" onclick="showTab('orders')" style="display: none;">My Orders & Sales</a>
+            <a href="#profile" id="navProfileTab" onclick="showTab('profile')" style="display: none;">My Profile</a>
         </nav>
         <div id="navUserArea">
             <button class="btn-primary" onclick="openModal('authModal')">Login / Register</button>
         </div>
     </header>
 
-    <!-- SECTION 1: HOME LANDING -->
+    <!-- SECTION 1: HOME -->
     <section id="tab-home" class="page-tab active">
         <div class="hero-banner">
             <div class="hero-text">
@@ -41,21 +41,55 @@
                 </div>
             </div>
         </div>
-
-        <div class="stats-bar">
-            <div class="stat-card"><h3>10,000+</h3><p>Registered Farmers</p></div>
-            <div class="stat-card"><h3>500+</h3><p>Active FPOs</p></div>
-            <div class="stat-card"><h3>₹2.5 Cr+</h3><p>Direct Savings</p></div>
-            <div class="stat-card"><h3>0%</h3><p>Middleman Exploitation</p></div>
-        </div>
     </section>
 
-    <!-- SECTION 2: MARKETPLACE -->
+    <!-- SECTION 2: MARKETPLACE & BUYER AGGREGATOR -->
     <section id="tab-marketplace" class="page-tab">
         <div class="container">
+            <div class="form-card" style="margin-bottom: 30px; border-left: 5px solid #1b5e20;">
+                <h3>🛒 Smart Buyer Requirement Aggregator</h3>
+                <p style="color: #555; font-size: 14px;">Enter large volume orders to automatically aggregate produce across multiple small farmers.</p>
+
+                <form onsubmit="handleBuyerMatch(event)" style="margin-top: 15px;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Target Crop</label>
+                            <select id="bCrop" required>
+                                <option value="Potatoes">Potatoes</option>
+                                <option value="Tomatoes">Tomatoes</option>
+                                <option value="Onions">Onions</option>
+                                <option value="Wheat">Wheat</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Required Quantity (kg)*</label>
+                            <input type="number" id="bQty" placeholder="e.g. 1500" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Max Budget Price (₹/kg)*</label>
+                            <input type="number" id="bMaxPrice" placeholder="e.g. 50" required>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="submit" class="btn-primary">⚡ Auto-Aggregate Farmers</button>
+                        <button type="button" class="btn-outline" style="border-color: #666; color: #333;" onclick="loadMarketplace()">🔄 Reset All Listings</button>
+                    </div>
+                </form>
+
+                <div id="poolingSummaryBox" class="ai-inspection-result ai-success-box" style="display: none; margin-top: 20px;">
+                    <div class="ai-status-header">
+                        <span class="ai-badge">🤝 Multi-Farmer Pool Verified</span>
+                        <strong id="poolStatusText"></strong>
+                    </div>
+                    <p id="poolSummaryDetail" style="margin: 5px 0 15px 0;"></p>
+                    <button id="buyNowBtn" class="btn-primary" style="background-color: #2e7d32; font-size: 16px;" onclick="executeRazorpayCheckout()">
+                        💳 Pay & Buy Aggregated Produce Now
+                    </button>
+                </div>
+            </div>
+
             <div class="section-header">
-                <h2>Direct Farm Marketplace</h2>
-                <p>Fresh, AI-Certified crops aggregated directly from verified FPOs and local farmers.</p>
+                <h2>Marketplace Listings</h2>
             </div>
             <div id="productGrid" class="product-grid"></div>
         </div>
@@ -66,8 +100,40 @@
         <div class="container">
             <div id="farmerAuthGate" class="form-card text-center" style="display: none;">
                 <h2>🔒 Registered Farmers Only</h2>
-                <p>You must be registered and logged in as a <strong>Farmer/FPO</strong> to add crop listings.</p>
+                <p>You must be registered and logged in as a <strong>Farmer/FPO</strong> to access this portal.</p>
                 <button class="btn-primary" onclick="openModal('authModal')">Login / Register as Farmer</button>
+            </div>
+
+            <div id="farmerProfileFormCard" class="form-card" style="display: none;">
+                <h2>⚠️ Mandatory Farmer Profile Completion</h2>
+                <p>Welcome, <strong id="profileFarmerName"></strong>! You must complete your profile before listing crops.</p>
+                <form onsubmit="handleSaveProfile(event)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Farm Size (in Acres)*</label>
+                            <input type="number" step="0.1" id="pFarmSize" placeholder="e.g. 4.5" required>
+                        </div>
+                        <div class="form-group">
+                            <label>District*</label>
+                            <input type="text" id="pDistrict" placeholder="e.g. Pune" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>State*</label>
+                            <input type="text" id="pState" placeholder="e.g. Maharashtra" required>
+                        </div>
+                        <div class="form-group">
+                            <label>UPI ID for Direct Payments*</label>
+                            <input type="text" id="pUpi" placeholder="e.g. farmer@upi" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>FPO / Collective Name (Optional)</label>
+                        <input type="text" id="pFpo" placeholder="e.g. Pune Agro FPO">
+                    </div>
+                    <button type="submit" class="btn-primary full-btn">Complete & Save Profile</button>
+                </form>
             </div>
 
             <div id="farmerFormCard" class="form-card" style="display: none;">
@@ -102,7 +168,17 @@
                         </div>
                     </div>
 
-                    <!-- AI PHOTO UPLOAD & INSPECTION FIELD -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Harvest Date*</label>
+                            <input type="date" id="fHarvestDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Farm Location (District, State)*</label>
+                            <input type="text" id="fLocation" placeholder="e.g. Pune, Maharashtra" required>
+                        </div>
+                    </div>
+
                     <div class="form-group ai-upload-box">
                         <label><strong>📷 Upload Produce Photo for AI Quality Verification</strong></label>
                         <input type="file" id="fCropImage" accept="image/*" required onchange="performAIQualityCheck(event)">
@@ -117,7 +193,6 @@
                         </div>
                     </div>
 
-                    <!-- SUBMIT BUTTON -->
                     <button type="submit" id="submitBtn" class="btn-primary full-btn" disabled style="opacity: 0.5; cursor: not-allowed;">
                         🔒 Awaiting AI Quality Verification...
                     </button>
@@ -126,25 +201,90 @@
         </div>
     </section>
 
-    <!-- SECTION 4: AI ANALYTICS -->
-    <section id="tab-analytics" class="page-tab">
+    <!-- SECTION 4: MY ORDERS & SALES HISTORY -->
+    <section id="tab-orders" class="page-tab">
         <div class="container">
             <div class="form-card">
-                <h2>📈 AI Demand & Price Forecasting</h2>
-                <p>Machine Learning engine predicting future market trends to help farmers price crops optimally.</p>
-                <div class="form-row">
-                    <select id="aiCropSelect">
-                        <option value="Tomatoes">Tomatoes</option>
-                        <option value="Onions">Onions</option>
-                    </select>
-                    <button onclick="fetchAIForecast()" class="btn-primary">Predict Trend</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-bottom: 20px;">
+                    <h2 id="ordersTabTitle">📦 Orders & Sales History</h2>
+                    <button class="btn-outline" style="border-color: #2e7d32; color: #2e7d32;" onclick="loadUserOrders()">🔄 Refresh</button>
                 </div>
-                <div id="aiOutput" class="ai-box">Select crop and click Predict Trend.</div>
+                
+                <div id="ordersNoticePolicy" style="display: none; background: #fff8e1; border-left: 4px solid #ffa000; padding: 10px 15px; border-radius: 4px; font-size: 13px; color: #795548; margin-bottom: 15px;">
+                    ℹ️ <strong>Cancellation Policy:</strong> Orders can be cancelled with an instant 100% refund within <strong>2 hours</strong> of placement before dispatch to logistics.
+                </div>
+
+                <div id="ordersContent">
+                    <p>Loading order history...</p>
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- LOGIN / REGISTER MODAL -->
+    <!-- SECTION 5: MY PROFILE -->
+    <section id="tab-profile" class="page-tab">
+        <div class="container">
+            <div class="form-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-bottom: 20px;">
+                    <h2>👤 My Profile</h2>
+                    <span class="badge ai-pass-badge">✓ Verified Account</span>
+                </div>
+
+                <div id="profileViewContainer">
+                    <div class="profile-details-grid" id="profileDisplayContent">
+                        <p>Loading profile details...</p>
+                    </div>
+                    <div style="margin-top: 20px; display: flex; gap: 10px;">
+                        <button class="btn-primary" onclick="toggleEditProfile(true)">✏️ Edit Profile</button>
+                        <button class="btn-outline" style="border-color: #2e7d32; color: #2e7d32;" onclick="showTab('farmer')">🌾 Back to Listing Portal</button>
+                    </div>
+                </div>
+
+                <form id="profileEditForm" style="display: none;" onsubmit="handleUpdateProfile(event)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Full Name*</label>
+                            <input type="text" id="eName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Phone Number*</label>
+                            <input type="text" id="ePhone" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Farm Size (Acres)*</label>
+                            <input type="number" step="0.1" id="eFarmSize" required>
+                        </div>
+                        <div class="form-group">
+                            <label>District*</label>
+                            <input type="text" id="eDistrict" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>State*</label>
+                            <input type="text" id="eState" required>
+                        </div>
+                        <div class="form-group">
+                            <label>UPI ID (For Payments)*</label>
+                            <input type="text" id="eUpi" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>FPO / Collective Name</label>
+                        <input type="text" id="eFpo">
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button type="submit" class="btn-primary">💾 Save Profile Changes</button>
+                        <button type="button" class="btn-outline" style="border-color: #d32f2f; color: #d32f2f;" onclick="toggleEditProfile(false)">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- AUTH MODAL -->
     <div id="authModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('authModal')">&times;</span>
@@ -161,10 +301,10 @@
                         <option value="buyer">🛒 Wholesale Buyer / Consumer</option>
                     </select>
                 </div>
-                <div class="form-group"><input type="text" id="rName" placeholder="Full Name / Organization" required></div>
+                <div class="form-group"><input type="text" id="rName" placeholder="Full Name" required></div>
                 <div class="form-group"><input type="email" id="rEmail" placeholder="Email Address" required></div>
                 <div class="form-group"><input type="text" id="rPhone" placeholder="Phone Number" required></div>
-                <button type="submit" class="btn-primary full-btn">Create Account & Login</button>
+                <button type="submit" class="btn-primary full-btn">Create Account & Continue</button>
             </form>
 
             <form id="loginForm" onsubmit="handleLogin(event)" style="display: none;">
@@ -177,44 +317,437 @@
         </div>
     </div>
 
+    <!-- SINGLE FARMER DIRECT BUY QUANTITY SELECTION MODAL -->
+    <div id="singleBuyModal" class="modal">
+        <div class="modal-content" style="width: 380px;">
+            <span class="close" onclick="closeModal('singleBuyModal')">&times;</span>
+            <h3 style="margin-top: 0; color: #1b5e20;">⚡ Direct Farm Purchase</h3>
+            <p id="sModalFarmerText" style="font-size: 13px; color: #555; margin-bottom: 15px;"></p>
+
+            <div class="form-group">
+                <label style="font-size: 13px;">Enter Desired Quantity (kg)*</label>
+                <input type="number" id="sModalQtyInput" min="1" oninput="updateSingleBuyPrice()" required>
+                <small id="sModalStockLimitText" style="color: #666;"></small>
+            </div>
+
+            <div style="background: #e8f5e9; padding: 12px; border-radius: 6px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; font-weight: bold; color: #1b5e20;">
+                    <span>Total Cost:</span>
+                    <span id="sModalTotalPrice">₹0</span>
+                </div>
+            </div>
+
+            <button class="btn-primary full-btn" style="background: #2e7d32; font-size: 16px;" onclick="proceedSingleBuyToPayment()">
+                💳 Proceed to Pay
+            </button>
+        </div>
+    </div>
+
+    <!-- PAYMENT GATEWAY DEMO MODAL -->
+    <div id="paymentModal" class="modal">
+        <div class="modal-content" style="width: 420px; text-align: center;">
+            <span class="close" onclick="closeModal('paymentModal')">&times;</span>
+            <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 15px;">
+                <span style="font-size: 24px;">💳</span>
+                <h3 style="margin: 0; color: #1b5e20;">Razorpay Secure Checkout</h3>
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: left; font-size: 14px; margin-bottom: 15px; border: 1px solid #e0e0e0;">
+                <p style="margin: 4px 0;"><strong>Order:</strong> Direct Farmer Bulk Procurement</p>
+                <p style="margin: 4px 0;"><strong>Total Quantity:</strong> <span id="payQtyText">0</span> kg</p>
+                <p style="margin: 4px 0;"><strong>Total Amount:</strong> <span id="payAmountText" style="color: #1b5e20; font-weight: bold; font-size: 16px;">₹0</span></p>
+            </div>
+
+            <div class="form-group" style="text-align: left;">
+                <label style="font-size: 13px;">Select Payment Method</label>
+                <select id="payMethod">
+                    <option value="upi">📱 UPI (Google Pay / PhonePe / Paytm)</option>
+                    <option value="card">💳 Credit / Debit Card</option>
+                    <option value="netbanking">🏦 Net Banking</option>
+                </select>
+            </div>
+
+            <button id="confirmPayBtn" class="btn-primary full-btn" style="background: #2e7d32; font-size: 16px; padding: 12px;" onclick="confirmDemoPayment()">
+                🔒 Confirm & Pay Now
+            </button>
+        </div>
+    </div>
+
     <script>
         let currentUser = JSON.parse(localStorage.getItem('agri_user')) || null;
         let verifiedQualityData = null;
         let uploadedImageData = null;
+        let currentAggregatedPool = null;
+        let selectedSingleCrop = null;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const today = new Date().toISOString().split('T')[0];
+            const dateInput = document.getElementById('fHarvestDate');
+            if (dateInput) dateInput.value = today;
+        });
 
         function updateUIState() {
             const navArea = document.getElementById('navUserArea');
+            const profileTabLink = document.getElementById('navProfileTab');
+            const ordersTabLink = document.getElementById('navOrdersTab');
+
             if (currentUser) {
                 navArea.innerHTML = `
                     <span class="user-badge">👋 ${currentUser.name} (${currentUser.role.toUpperCase()})</span>
                     <button class="btn-outline" onclick="logout()">Logout</button>
                 `;
+                ordersTabLink.style.display = 'inline-block';
+                if (currentUser.role === 'farmer') {
+                    profileTabLink.style.display = 'inline-block';
+                } else {
+                    profileTabLink.style.display = 'none';
+                }
             } else {
                 navArea.innerHTML = `<button class="btn-primary" onclick="openModal('authModal')">Login / Register</button>`;
+                profileTabLink.style.display = 'none';
+                ordersTabLink.style.display = 'none';
             }
             checkFarmerAccess();
         }
 
         function checkFarmerAccess() {
             const authGate = document.getElementById('farmerAuthGate');
-            const formCard = document.getElementById('farmerFormCard');
+            const profileFormCard = document.getElementById('farmerProfileFormCard');
+            const farmerFormCard = document.getElementById('farmerFormCard');
 
             if (currentUser && currentUser.role === 'farmer') {
                 authGate.style.display = 'none';
-                formCard.style.display = 'block';
-                document.getElementById('loggedInFarmerName').innerText = currentUser.name;
-                document.getElementById('loggedInFarmerEmail').innerText = currentUser.email;
+                
+                if (!currentUser.is_profile_complete) {
+                    profileFormCard.style.display = 'block';
+                    farmerFormCard.style.display = 'none';
+                    document.getElementById('profileFarmerName').innerText = currentUser.name;
+                } else {
+                    profileFormCard.style.display = 'none';
+                    farmerFormCard.style.display = 'block';
+                    document.getElementById('loggedInFarmerName').innerText = currentUser.name;
+                    document.getElementById('loggedInFarmerEmail').innerText = currentUser.email;
+
+                    const locationInput = document.getElementById('fLocation');
+                    if (locationInput && currentUser.district && currentUser.state) {
+                        locationInput.value = `${currentUser.district}, ${currentUser.state}`;
+                    }
+                }
             } else {
                 authGate.style.display = 'block';
-                formCard.style.display = 'none';
+                profileFormCard.style.display = 'none';
+                farmerFormCard.style.display = 'none';
+            }
+        }
+
+        // OPEN DIRECT BUY MODAL FOR A SINGLE FARMER CARD
+        function openSingleBuyModal(cropObj) {
+            selectedSingleCrop = cropObj;
+            document.getElementById('sModalFarmerText').innerHTML = 
+                `Buying <strong>${cropObj.crop}</strong> directly from <strong>${cropObj.farmer}</strong> (📍 ${cropObj.location})`;
+            
+            const maxStock = cropObj.qty_kg;
+            const input = document.getElementById('sModalQtyInput');
+            input.max = maxStock;
+            input.value = Math.min(10, maxStock);
+            document.getElementById('sModalStockLimitText').innerText = `Available Stock Limit: ${maxStock} kg`;
+
+            updateSingleBuyPrice();
+            openModal('singleBuyModal');
+        }
+
+        // RECALCULATE PRICE AS USER TYPING QUANTITY
+        function updateSingleBuyPrice() {
+            if (!selectedSingleCrop) return;
+            const input = document.getElementById('sModalQtyInput');
+            let val = parseFloat(input.value) || 0;
+
+            if (val > selectedSingleCrop.qty_kg) {
+                val = selectedSingleCrop.qty_kg;
+                input.value = val;
+            }
+
+            const total = val * selectedSingleCrop.price;
+            document.getElementById('sModalTotalPrice').innerText = `₹${total.toFixed(2)}`;
+        }
+
+        // PROCEED FROM SINGLE BUY MODAL TO PAY GATEWAY
+        function proceedSingleBuyToPayment() {
+            const qty = parseFloat(document.getElementById('sModalQtyInput').value) || 0;
+            if (qty <= 0) {
+                alert("Please enter a valid quantity!");
+                return;
+            }
+
+            currentAggregatedPool = {
+                target_qty: qty,
+                fulfilled_qty: qty,
+                farmer_count: 1,
+                weighted_avg_price: selectedSingleCrop.price,
+                total_estimated_cost: qty * selectedSingleCrop.price,
+                pooled_crops: [{
+                    id: selectedSingleCrop.id,
+                    farmer: selectedSingleCrop.farmer,
+                    crop: selectedSingleCrop.crop,
+                    taken_kg: qty,
+                    price: selectedSingleCrop.price,
+                    location: selectedSingleCrop.location
+                }]
+            };
+
+            closeModal('singleBuyModal');
+            executeRazorpayCheckout();
+        }
+
+        async function loadUserOrders() {
+            if (!currentUser) return;
+            const content = document.getElementById('ordersContent');
+            const title = document.getElementById('ordersTabTitle');
+            const policyNotice = document.getElementById('ordersNoticePolicy');
+            
+            content.innerHTML = "<p>Loading order history...</p>";
+
+            try {
+                const res = await fetch(`/api/orders/user/${currentUser.email}`);
+                const data = await res.json();
+
+                if (res.ok && data.status === "success") {
+                    if (data.role === 'farmer') {
+                        title.innerText = "👨‍🌾 My Crop Sales History";
+                        policyNotice.style.display = 'none';
+
+                        if (data.orders.length === 0) {
+                            content.innerHTML = "<p>No sales recorded yet.</p>";
+                            return;
+                        }
+                        content.innerHTML = `
+                            <table class="orders-table">
+                                <thead>
+                                    <tr>
+                                        <th>Order ID</th>
+                                        <th>Crop</th>
+                                        <th>Quantity</th>
+                                        <th>Total Revenue</th>
+                                        <th>Buyer Details</th>
+                                        <th>Payment ID</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.orders.map(o => `
+                                        <tr>
+                                            <td>#${o.order_id}</td>
+                                            <td><strong>${o.crop}</strong></td>
+                                            <td>${o.qty_kg} kg</td>
+                                            <td class="price-text">₹${o.total_price}</td>
+                                            <td>${o.customer_name} (${o.customer_email})</td>
+                                            <td><small>${o.payment_id}</small></td>
+                                            <td>
+                                                <span class="status-badge ${o.status.includes('Cancelled') ? 'red' : 'green'}">
+                                                    ${o.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    } else {
+                        title.innerText = "🛒 My Purchase History";
+                        policyNotice.style.display = 'block';
+
+                        if (data.orders.length === 0) {
+                            content.innerHTML = "<p>No orders placed yet.</p>";
+                            return;
+                        }
+                        content.innerHTML = `
+                            <table class="orders-table">
+                                <thead>
+                                    <tr>
+                                        <th>Order ID</th>
+                                        <th>Crop</th>
+                                        <th>Quantity</th>
+                                        <th>Total Paid</th>
+                                        <th>Farmer / Origin</th>
+                                        <th>Payment ID</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.orders.map(o => {
+                                        let actionTd = '';
+                                        if (o.status === 'Paid & Confirmed') {
+                                            if (o.can_cancel) {
+                                                actionTd = `
+                                                    <button class="btn-cancel-order" onclick="cancelBuyerOrder(${o.order_id})">
+                                                        🚫 Cancel & Refund (${o.minutes_left}m left)
+                                                    </button>
+                                                `;
+                                            } else {
+                                                actionTd = `<span style="color:#888; font-size:12px;">🚚 Window Expired (Dispatched)</span>`;
+                                            }
+                                        } else {
+                                            actionTd = `<span style="color:#d32f2f; font-weight:bold; font-size:12px;">💸 Refunded</span>`;
+                                        }
+
+                                        return `
+                                            <tr>
+                                                <td>#${o.order_id}</td>
+                                                <td><strong>${o.crop}</strong></td>
+                                                <td>${o.qty_kg} kg</td>
+                                                <td class="price-text">₹${o.total_price}</td>
+                                                <td>${o.farmer_name} (📍 ${o.location})</td>
+                                                <td><small>${o.payment_id}</small></td>
+                                                <td>
+                                                    <span class="status-badge ${o.status.includes('Cancelled') ? 'red' : 'green'}">
+                                                        ${o.status}
+                                                    </span>
+                                                </td>
+                                                <td>${actionTd}</td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    }
+                } else {
+                    content.innerHTML = `<p>${data.message}</p>`;
+                }
+            } catch (err) {
+                content.innerHTML = "<p>Failed to load orders.</p>";
+            }
+        }
+
+        async function cancelBuyerOrder(orderId) {
+            if (!confirm(`Are you sure you want to cancel Order #${orderId}?\n\nThis will initiate an immediate 100% refund and restore produce stock to the farmer.`)) return;
+
+            try {
+                const res = await fetch('/api/orders/cancel', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        order_id: orderId,
+                        buyer_email: currentUser.email
+                    })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.status === "success") {
+                    alert(data.message);
+                    loadUserOrders();
+                } else {
+                    alert("⚠️ " + data.message);
+                }
+            } catch (err) {
+                alert("Server error processing cancellation.");
+            }
+        }
+
+        async function loadFarmerProfile() {
+            if (!currentUser) return;
+            try {
+                const res = await fetch(`/api/farmer/profile/${currentUser.email}`);
+                const data = await res.json();
+
+                if (res.ok && data.status === "success") {
+                    const p = data.profile;
+                    document.getElementById('profileDisplayContent').innerHTML = `
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Full Name</label>
+                                <input type="text" value="${p.name}" disabled readonly>
+                            </div>
+                            <div class="form-group">
+                                <label>Email Address</label>
+                                <input type="text" value="${p.email}" disabled readonly>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Phone Number</label>
+                                <input type="text" value="${p.phone}" disabled readonly>
+                            </div>
+                            <div class="form-group">
+                                <label>Farm Size (Acres)</label>
+                                <input type="text" value="${p.farm_size} Acres" disabled readonly>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Location (District, State)</label>
+                                <input type="text" value="${p.district}, ${p.state}" disabled readonly>
+                            </div>
+                            <div class="form-group">
+                                <label>Linked UPI ID (Escrow Payment)</label>
+                                <input type="text" value="${p.upi_id}" disabled readonly>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>FPO / Collective Affiliation</label>
+                            <input type="text" value="${p.fpo || 'Independent Farmer'}" disabled readonly>
+                        </div>
+                    `;
+
+                    document.getElementById('eName').value = p.name;
+                    document.getElementById('ePhone').value = p.phone;
+                    document.getElementById('eFarmSize').value = p.farm_size;
+                    document.getElementById('eDistrict').value = p.district;
+                    document.getElementById('eState').value = p.state;
+                    document.getElementById('eUpi').value = p.upi_id;
+                    document.getElementById('eFpo').value = p.fpo || '';
+                }
+            } catch (err) {
+                console.error("Error loading profile:", err);
+            }
+        }
+
+        function toggleEditProfile(isEditing) {
+            document.getElementById('profileViewContainer').style.display = isEditing ? 'none' : 'block';
+            document.getElementById('profileEditForm').style.display = isEditing ? 'block' : 'none';
+        }
+
+        async function handleUpdateProfile(e) {
+            e.preventDefault();
+            const payload = {
+                email: currentUser.email,
+                name: document.getElementById('eName').value,
+                phone: document.getElementById('ePhone').value,
+                farm_size: parseFloat(document.getElementById('eFarmSize').value),
+                district: document.getElementById('eDistrict').value,
+                state: document.getElementById('eState').value,
+                upi_id: document.getElementById('eUpi').value,
+                fpo: document.getElementById('eFpo').value
+            };
+
+            const res = await fetch('/api/farmer/profile/update', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (res.ok && data.status === "success") {
+                currentUser.name = payload.name;
+                currentUser.district = payload.district;
+                currentUser.state = payload.state;
+                localStorage.setItem('agri_user', JSON.stringify(currentUser));
+                alert("🎉 " + data.message);
+                toggleEditProfile(false);
+                updateUIState();
+                loadFarmerProfile();
+            } else {
+                alert("❌ " + data.message);
             }
         }
 
         function showTab(tabId) {
             document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'));
             document.getElementById(`tab-${tabId}`).classList.add('active');
-            if(tabId === 'farmer') checkFarmerAccess();
-            if(tabId === 'marketplace') loadMarketplace();
+            if (tabId === 'farmer') checkFarmerAccess();
+            if (tabId === 'marketplace') loadMarketplace();
+            if (tabId === 'profile') loadFarmerProfile();
+            if (tabId === 'orders') loadUserOrders();
         }
 
         function openModal(id) { document.getElementById(id).style.display = 'flex'; }
@@ -236,46 +769,97 @@
 
         async function handleRegistration(e) {
             e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.innerText = "⏳ Registering...";
+            btn.disabled = true;
+
             const payload = {
                 role: document.getElementById('rRole').value,
                 name: document.getElementById('rName').value,
                 email: document.getElementById('rEmail').value,
                 phone: document.getElementById('rPhone').value
             };
-            const res = await fetch('/api/register', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if(res.ok) {
-                currentUser = data.user;
-                localStorage.setItem('agri_user', JSON.stringify(currentUser));
-                updateUIState();
-                closeModal('authModal');
-                alert(data.message);
-            } else {
-                alert(data.message);
+
+            try {
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                
+                if (res.ok && data.status === "success") {
+                    currentUser = data.user;
+                    localStorage.setItem('agri_user', JSON.stringify(currentUser));
+                    updateUIState();
+                    closeModal('authModal');
+                    alert("🎉 " + data.message);
+                    showTab('farmer');
+                } else {
+                    alert("⚠️ " + (data.message || "Registration failed"));
+                    if (data.message && data.message.includes("already registered")) {
+                        toggleAuthMode('login');
+                        document.getElementById('lEmail').value = payload.email;
+                    }
+                }
+            } catch (err) {
+                alert("Server connection error.");
+            } finally {
+                btn.innerText = "Create Account & Continue";
+                btn.disabled = false;
             }
         }
 
         async function handleLogin(e) {
             e.preventDefault();
             const email = document.getElementById('lEmail').value;
-            const res = await fetch('/api/login', {
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ email: email })
+                });
+                const data = await res.json();
+                if (res.ok && data.status === "success") {
+                    currentUser = data.user;
+                    localStorage.setItem('agri_user', JSON.stringify(currentUser));
+                    updateUIState();
+                    closeModal('authModal');
+                    showTab('farmer');
+                } else {
+                    alert("⚠️ " + (data.message || "Login failed"));
+                }
+            } catch (err) {
+                alert("Server connection error.");
+            }
+        }
+
+        async function handleSaveProfile(e) {
+            e.preventDefault();
+            const payload = {
+                email: currentUser.email,
+                farm_size: parseFloat(document.getElementById('pFarmSize').value),
+                district: document.getElementById('pDistrict').value,
+                state: document.getElementById('pState').value,
+                upi_id: document.getElementById('pUpi').value,
+                fpo_name: document.getElementById('pFpo').value
+            };
+
+            const res = await fetch('/api/farmer/profile', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ email: email })
+                body: JSON.stringify(payload)
             });
             const data = await res.json();
-            if (res.ok) {
-                currentUser = data.user;
+            if(res.ok) {
+                currentUser.is_profile_complete = 1;
+                currentUser.district = payload.district;
+                currentUser.state = payload.state;
                 localStorage.setItem('agri_user', JSON.stringify(currentUser));
+                alert("🎉 Profile Completed! You can now list produce.");
                 updateUIState();
-                closeModal('authModal');
-                alert(`Welcome back, ${currentUser.name}!`);
-            } else {
-                alert(data.message);
+                checkFarmerAccess();
             }
         }
 
@@ -286,7 +870,6 @@
             showTab('home');
         }
 
-        // --- AI QUALITY & CROP MATCH CHECK FUNCTION ---
         async function performAIQualityCheck(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -320,13 +903,13 @@
                 if (data.status === "mismatch") {
                     verifiedQualityData = null;
                     box.className = "ai-inspection-result ai-error-box";
-                    document.getElementById('aiGradeText').innerText = "❌ Crop Mismatch Error";
+                    document.getElementById('aiGradeText').innerText = "❌ Crop Verification Failed";
                     document.getElementById('aiAnalysisDetail').innerText = data.message;
 
                     submitBtn.disabled = true;
                     submitBtn.style.opacity = "0.5";
                     submitBtn.style.cursor = "not-allowed";
-                    submitBtn.innerText = "🚫 Crop Mismatch - Cannot Publish Listing";
+                    submitBtn.innerText = "🚫 Crop Mismatch / Unrelated Image - Cannot Publish Listing";
                     submitBtn.style.backgroundColor = "#d32f2f";
                 } else {
                     verifiedQualityData = data;
@@ -355,7 +938,6 @@
             submitBtn.style.backgroundColor = "#2e7d32";
         }
 
-        // --- SUBMIT FARMER LISTING (SAVED TO SQL & REDIRECTS TO MARKETPLACE) ---
         async function handleCropAdd(e) {
             e.preventDefault();
             if (!currentUser || currentUser.role !== 'farmer') {
@@ -373,6 +955,8 @@
                 quantity_kg: parseFloat(document.getElementById('fQty').value),
                 price_per_kg: parseFloat(document.getElementById('fPrice').value),
                 fpo: document.getElementById('fFPO').value || 'Independent',
+                harvest_date: document.getElementById('fHarvestDate').value,
+                location: document.getElementById('fLocation').value,
                 image_data: uploadedImageData,
                 quality_grade: verifiedQualityData.quality_grade,
                 quality_score: verifiedQualityData.quality_score
@@ -394,58 +978,189 @@
                     alert("❌ " + data.message);
                 }
             } catch (err) {
-                alert("Server error occurred while publishing. Please try again.");
-                console.error(err);
+                alert("Server error occurred while publishing.");
             }
         }
 
+        async function deleteCropListing(cropId) {
+            if (!currentUser || currentUser.role !== 'farmer') {
+                alert("🔒 Only logged in farmers can delete listings!");
+                return;
+            }
+
+            if (!confirm("Are you sure you want to delete this produce listing from the marketplace?")) return;
+
+            try {
+                const res = await fetch('/api/crops/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        crop_id: cropId,
+                        farmer_email: currentUser.email
+                    })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.status === "success") {
+                    alert("🗑️ " + data.message);
+                    loadMarketplace();
+                } else {
+                    alert(data.message);
+                }
+            } catch (err) {
+                alert("Failed to connect to server.");
+            }
+        }
+
+        async function handleBuyerMatch(e) {
+            e.preventDefault();
+            const payload = {
+                crop_name: document.getElementById('bCrop').value,
+                quantity_kg: parseFloat(document.getElementById('bQty').value),
+                max_price: parseFloat(document.getElementById('bMaxPrice').value)
+            };
+
+            try {
+                const res = await fetch('/api/buyer/smart-match', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                const box = document.getElementById('poolingSummaryBox');
+
+                if (data.status === "success") {
+                    currentAggregatedPool = data;
+                    box.style.display = 'block';
+                    
+                    if (data.is_fully_met) {
+                        box.className = "ai-inspection-result ai-success-box";
+                        document.getElementById('poolStatusText').innerText = `Full Match: 100% Fulfilled (${data.fulfilled_qty} kg)`;
+                        document.getElementById('poolSummaryDetail').innerText = 
+                            `Pooled stock from ${data.farmer_count} farmer(s) at weighted avg rate ₹${data.weighted_avg_price}/kg. Total: ₹${data.total_estimated_cost}`;
+                    } else {
+                        box.className = "ai-inspection-result ai-error-box";
+                        document.getElementById('poolStatusText').innerText = `Partial Match: ${data.fulfilled_qty} kg of ${data.target_qty} kg found`;
+                        document.getElementById('poolSummaryDetail').innerText = 
+                            `Aggregated ${data.farmer_count} available farmer(s). Short by ${data.target_qty - data.fulfilled_qty} kg. Total estimate: ₹${data.total_estimated_cost}`;
+                    }
+
+                    renderMarketplaceCards(data.pooled_crops, true);
+                } else {
+                    currentAggregatedPool = null;
+                    box.style.display = 'block';
+                    box.className = "ai-inspection-result ai-error-box";
+                    document.getElementById('poolStatusText').innerText = "No Match Found";
+                    document.getElementById('poolSummaryDetail').innerText = data.message;
+                    document.getElementById('productGrid').innerHTML = `<p class="text-center">No listings matching your bulk requirement.</p>`;
+                }
+            } catch (err) {
+                alert("Server error running aggregation engine.");
+            }
+        }
+
+        function executeRazorpayCheckout() {
+            if (!currentAggregatedPool || !currentAggregatedPool.pooled_crops) {
+                alert("No active requirement pooled!");
+                return;
+            }
+            
+            document.getElementById('payQtyText').innerText = currentAggregatedPool.fulfilled_qty;
+            document.getElementById('payAmountText').innerText = `₹${currentAggregatedPool.total_estimated_cost}`;
+            openModal('paymentModal');
+        }
+
+        async function confirmDemoPayment() {
+            const btn = document.getElementById('confirmPayBtn');
+            btn.innerText = "⏳ Processing Payment & Escrow Lock...";
+            btn.disabled = true;
+
+            const buyerName = currentUser ? currentUser.name : "Wholesale Buyer";
+            const buyerEmail = currentUser ? currentUser.email : "buyer@example.com";
+            const mockPayId = `pay_rzp_${Math.floor(Math.random() * 899999 + 100000)}`;
+
+            try {
+                const orderRes = await fetch('/api/orders/place', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        buyer_name: buyerName,
+                        buyer_email: buyerEmail,
+                        payment_id: mockPayId,
+                        pooled_items: currentAggregatedPool.pooled_crops
+                    })
+                });
+
+                const orderData = await orderRes.json();
+                if (orderRes.ok && orderData.status === "success") {
+                    closeModal('paymentModal');
+                    alert(`🎉 Payment Successful!\n${orderData.message}\nOrder saved to your account!`);
+                    loadMarketplace();
+                    showTab('orders');
+                } else {
+                    alert("⚠️ " + orderData.message);
+                }
+            } catch (err) {
+                alert("Server error completing purchase.");
+            } finally {
+                btn.innerText = "🔒 Confirm & Pay Now";
+                btn.disabled = false;
+            }
+        }
+
+        function renderMarketplaceCards(crops, isPooled = false) {
+            const grid = document.getElementById('productGrid');
+            if (!crops || crops.length === 0) {
+                grid.innerHTML = `<p>No listings found.</p>`;
+                return;
+            }
+
+            grid.innerHTML = crops.map(c => {
+                const isOwner = currentUser && currentUser.role === 'farmer' && 
+                                currentUser.name.trim().toLowerCase() === c.farmer.trim().toLowerCase();
+                
+                const cropJsonStr = JSON.stringify(c).replace(/"/g, '&quot;');
+
+                return `
+                    <div class="product-card">
+                        <img src="${c.image}" alt="${c.crop}">
+                        <div class="card-details">
+                            <span class="badge">${c.fpo}</span>
+                            <span class="badge ai-pass-badge">✓ AI Passed: ${c.quality_grade}</span>
+                            <h3>${c.crop}</h3>
+                            <p class="farmer-tag">📍 ${c.location} | By ${c.farmer}</p>
+                            ${isPooled ? `<p style="color:#2e7d32; font-weight:bold; font-size:13px; margin:4px 0;">📦 Contributes: ${c.taken_kg} kg to order</p>` : ''}
+                            <div class="meta-dates">
+                                <small>🌾 Harvested: ${c.harvest_date}</small><br>
+                                <small>📅 Published: ${c.publish_date}</small>
+                            </div>
+                            <div class="card-footer">
+                                <span class="price">₹${c.price} <small>/ kg</small></span>
+                                <span class="stock">${c.stock_kg || c.qty_kg} kg stock</span>
+                            </div>
+
+                            ${!isOwner ? `
+                                <button class="btn-buy-direct" onclick='openSingleBuyModal(${cropJsonStr})'>
+                                    ⚡ Buy Direct
+                                </button>
+                            ` : `
+                                <button class="btn-delete-listing" onclick="deleteCropListing(${c.id})">
+                                    🗑️ Delete My Listing
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
         async function loadMarketplace() {
+            document.getElementById('poolingSummaryBox').style.display = 'none';
+            currentAggregatedPool = null;
             const res = await fetch('/api/crops/list');
             const data = await res.json();
-            const grid = document.getElementById('productGrid');
-            grid.innerHTML = data.crops.map(c => `
-                <div class="product-card">
-                    <img src="${c.image}" alt="${c.crop}">
-                    <div class="card-details">
-                        <span class="badge">${c.fpo}</span>
-                        <span class="badge ai-pass-badge">✓ AI Passed: ${c.quality_grade}</span>
-                        <h3>${c.crop}</h3>
-                        <p class="farmer-tag">By ${c.farmer}</p>
-                        <div class="card-footer">
-                            <span class="price">₹${c.price} <small>/ kg</small></span>
-                            <span class="stock">${c.qty_kg} kg left</span>
-                        </div>
-                        <button class="btn-primary full-btn" onclick="buyCrop(${c.id}, '${c.crop}', ${c.price})">Buy Direct</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        async function buyCrop(id, crop, price) {
-            const buyer = prompt("Enter your Name/Organization to buy:");
-            if(!buyer) return;
-            const qty = prompt(`How many kg of ${crop} would you like to buy?`);
-            if(!qty) return;
-
-            const total = parseFloat(qty) * price;
-            await fetch('/api/order/create', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ crop_id: id, buyer_name: buyer, qty_kg: parseFloat(qty), total_price: total })
-            });
-            alert(`Order Confirmed! Total: ₹${total}. Money held in Escrow until delivery.`);
-        }
-
-        async function fetchAIForecast() {
-            const crop = document.getElementById('aiCropSelect').value;
-            const res = await fetch(`/api/ai/forecast/${crop}`);
-            const data = await res.json();
-            document.getElementById('aiOutput').innerHTML = `
-                <h3>AI Analysis for ${data.crop}</h3>
-                <p><strong>Predicted Next Month Demand:</strong> ${data.predicted_demand_quintals} Quintals</p>
-                <p><strong>Pricing Recommendation:</strong> ${data.price_recommendation}</p>
-                <p><strong>Market Status:</strong> ${data.market_status}</p>
-            `;
+            renderMarketplaceCards(data.crops, false);
         }
 
         updateUIState();
