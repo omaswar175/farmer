@@ -1,13 +1,12 @@
 import sqlite3
 from flask import Flask, render_template, request, jsonify
 import random
-import math
 from datetime import datetime, date
 
 app = Flask(__name__)
 DB_NAME = "database.db"
 
-# --- SQL DATABASE INITIALIZATION ---
+# --- SQL DATABASE INITIALIZATION & SAFE AUTO-MIGRATION ---
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -29,7 +28,7 @@ def init_db():
         )
     ''')
 
-    cursor.execute('SELECT COUNT(*) FROM users')
+    cursor.execute('SELECT COUNT(*) FROM users WHERE role = "farmer"')
     if cursor.fetchone()[0] == 0:
         cursor.execute('''
             INSERT INTO users (role, name, email, phone, details, farm_size_acres, district, state, upi_id, is_profile_complete)
@@ -54,16 +53,7 @@ def init_db():
         )
     ''')
 
-    cursor.execute("PRAGMA table_info(crops)")
-    crop_cols = [c[1] for c in cursor.fetchall()]
-    if "location" not in crop_cols:
-        cursor.execute("ALTER TABLE crops ADD COLUMN location TEXT NOT NULL DEFAULT 'Pune, Maharashtra'")
-    if "harvest_date" not in crop_cols:
-        cursor.execute("ALTER TABLE crops ADD COLUMN harvest_date TEXT NOT NULL DEFAULT ''")
-    if "publish_date" not in crop_cols:
-        cursor.execute("ALTER TABLE crops ADD COLUMN publish_date TEXT NOT NULL DEFAULT ''")
-
-    # 3. Orders Table (With Order Timestamp)
+    # 3. Orders Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,24 +64,54 @@ def init_db():
             total_price REAL NOT NULL,
             payment_id TEXT NOT NULL DEFAULT '',
             status TEXT DEFAULT 'Paid & Confirmed',
-            order_time TEXT NOT NULL DEFAULT ''
+            order_time TEXT NOT NULL DEFAULT '',
+            delivery_otp TEXT NOT NULL DEFAULT '1234'
         )
     ''')
-    
+
+    # 4. Logistics Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS logistics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL UNIQUE,
+            carrier_email TEXT DEFAULT '',
+            carrier_name TEXT DEFAULT '',
+            vehicle_type TEXT NOT NULL DEFAULT 'Pickup Van',
+            vehicle_number TEXT NOT NULL DEFAULT '',
+            driver_name TEXT NOT NULL DEFAULT '',
+            driver_phone TEXT NOT NULL DEFAULT '',
+            pickup_location TEXT NOT NULL DEFAULT 'Farm Origin',
+            delivery_status TEXT DEFAULT 'Unassigned - Awaiting Carrier Acceptance',
+            route_distance_km REAL DEFAULT 25.0,
+            assigned_at TEXT NOT NULL DEFAULT '',
+            multi_pickup_route TEXT DEFAULT '',
+            est_fuel_cost REAL DEFAULT 0.0
+        )
+    ''')
+
+    # Safe Schema Auto-Migration
+    cursor.execute("PRAGMA table_info(logistics)")
+    logistics_cols = [c[1] for c in cursor.fetchall()]
+    if "carrier_email" not in logistics_cols:
+        cursor.execute("ALTER TABLE logistics ADD COLUMN carrier_email TEXT DEFAULT ''")
+    if "carrier_name" not in logistics_cols:
+        cursor.execute("ALTER TABLE logistics ADD COLUMN carrier_name TEXT DEFAULT ''")
+    if "multi_pickup_route" not in logistics_cols:
+        cursor.execute("ALTER TABLE logistics ADD COLUMN multi_pickup_route TEXT DEFAULT ''")
+    if "est_fuel_cost" not in logistics_cols:
+        cursor.execute("ALTER TABLE logistics ADD COLUMN est_fuel_cost REAL DEFAULT 0.0")
+
     cursor.execute("PRAGMA table_info(orders)")
     order_cols = [c[1] for c in cursor.fetchall()]
-    if "buyer_email" not in order_cols:
-        cursor.execute("ALTER TABLE orders ADD COLUMN buyer_email TEXT NOT NULL DEFAULT ''")
-    if "payment_id" not in order_cols:
-        cursor.execute("ALTER TABLE orders ADD COLUMN payment_id TEXT NOT NULL DEFAULT ''")
-    if "order_time" not in order_cols:
-        cursor.execute("ALTER TABLE orders ADD COLUMN order_time TEXT NOT NULL DEFAULT ''")
+    if "delivery_otp" not in order_cols:
+        cursor.execute("ALTER TABLE orders ADD COLUMN delivery_otp TEXT NOT NULL DEFAULT '1234'")
 
     conn.commit()
     conn.close()
 
 init_db()
 
+# --- AUTHENTICATION & USER ROUTES ---
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -128,7 +148,7 @@ def register():
 
         return jsonify({
             "status": "success", 
-            "message": "Account created successfully!",
+            "message": f"Registered successfully as {role.upper()}!",
             "user": {"id": user_id, "name": name, "email": email, "role": role, "is_profile_complete": is_complete}
         })
     except Exception as e:
@@ -185,20 +205,7 @@ def get_farmer_profile(email):
         return jsonify({"status": "success", "profile": {"name": row[0], "email": row[1], "phone": row[2], "role": row[3], "farm_size": row[4], "district": row[5], "state": row[6], "upi_id": row[7], "fpo": row[8], "is_profile_complete": row[9]}})
     return jsonify({"status": "error", "message": "Not found"}), 404
 
-@app.route('/api/farmer/profile/update', methods=['POST'])
-def update_profile():
-    data = request.get_json() or {}
-    email = str(data.get('email', '')).strip().lower()
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE users SET name = ?, phone = ?, farm_size_acres = ?, district = ?, state = ?, upi_id = ?, details = ?
-        WHERE LOWER(email) = ? AND role = 'farmer'
-    ''', (data.get('name'), data.get('phone'), data.get('farm_size'), data.get('district'), data.get('state'), data.get('upi_id'), data.get('fpo'), email))
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "success", "message": "Profile updated!"})
-
+# --- AI QUALITY CHECK & CROPS ROUTES ---
 @app.route('/api/ai/quality-check', methods=['POST'])
 def quality_check():
     data = request.get_json() or {}
@@ -291,6 +298,7 @@ def list_crops():
     crops = [{"id": r[0], "farmer": r[1], "crop": r[2], "qty_kg": r[3], "price": r[4], "fpo": r[5], "location": r[6], "harvest_date": r[7], "publish_date": r[8], "image": r[9], "quality_grade": r[10], "quality_score": r[11]} for r in rows]
     return jsonify({"crops": crops})
 
+# --- BUYER MATCHING & MULTI-FARMER SINGLE TRUCK ORDERS ---
 @app.route('/api/buyer/smart-match', methods=['POST'])
 def smart_match_requirement():
     data = request.get_json() or {}
@@ -360,27 +368,187 @@ def place_order():
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
 
+        pickup_stops = []
+        total_batch_qty = 0.0
+        for item in pooled_items:
+            qty = item['taken_kg']
+            total_batch_qty += qty
+            pickup_stops.append(f"Pickup {qty}kg from {item['farmer']} (📍 {item.get('location', 'Farm Origin')})")
+        
+        waypoint_text = " ➔ ".join(pickup_stops) + f" ➔ Final Delivery to {buyer_name}"
+        total_distance = round(15.0 + (len(pooled_items) * 12.5), 1)
+        fuel_cost = round(total_distance * 11.5, 2)
+        generated_otp = str(random.randint(1000, 9999))
+
         for item in pooled_items:
             crop_id = item['id']
             qty_purchased = item['taken_kg']
             total_item_price = qty_purchased * item['price']
 
             cursor.execute('''
-                INSERT INTO orders (crop_id, buyer_name, buyer_email, qty_kg, total_price, payment_id, status, order_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (crop_id, buyer_name, buyer_email, qty_purchased, total_item_price, payment_id, "Paid & Confirmed", now_iso))
+                INSERT INTO orders (crop_id, buyer_name, buyer_email, qty_kg, total_price, payment_id, status, order_time, delivery_otp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (crop_id, buyer_name, buyer_email, qty_purchased, total_item_price, payment_id, "Paid & Confirmed", now_iso, generated_otp))
+
+            order_id = cursor.lastrowid
+            vehicle_choice = "Single Pickup Truck (Cap: 1.5 Ton)" if total_batch_qty <= 1500 else "Heavy Duty Cargo Truck"
 
             cursor.execute('''
-                UPDATE crops SET quantity_kg = quantity_kg - ? WHERE id = ?
-            ''', (qty_purchased, crop_id))
+                INSERT INTO logistics (order_id, vehicle_type, vehicle_number, driver_name, driver_phone, pickup_location, delivery_status, route_distance_km, assigned_at, multi_pickup_route, est_fuel_cost)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (order_id, vehicle_choice, "Pending", "Unassigned", "", item.get('location', 'Farm Origin'), "Unassigned - Awaiting Carrier Acceptance", total_distance, now_iso, waypoint_text, fuel_cost))
+
+            cursor.execute('UPDATE crops SET quantity_kg = quantity_kg - ? WHERE id = ?', (qty_purchased, crop_id))
 
         conn.commit()
         conn.close()
 
-        return jsonify({"status": "success", "message": f"Order successfully placed for {len(pooled_items)} farmer(s)! Payment ID: {payment_id}"})
+        return jsonify({"status": "success", "message": f"Single-Truck Multi-Pickup Route Optimized! Waypoints: {len(pooled_items)} Farmers."})
     except Exception as e:
         return jsonify({"status": "error", "message": f"Purchase error: {str(e)}"}), 500
 
+# --- CONSOLIDATED LOGISTICS PORTAL APIS ---
+@app.route('/api/logistics/available-orders', methods=['GET'])
+def get_available_logistics_orders():
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT o.payment_id, 
+                   GROUP_CONCAT(o.id) as order_ids,
+                   c.crop_name, 
+                   SUM(o.qty_kg) as total_qty, 
+                   o.buyer_name, 
+                   o.status, 
+                   l.delivery_status, 
+                   l.carrier_email, 
+                   l.vehicle_number, 
+                   l.driver_name, 
+                   l.driver_phone, 
+                   l.route_distance_km, 
+                   l.multi_pickup_route, 
+                   l.est_fuel_cost, 
+                   l.vehicle_type
+            FROM orders o
+            JOIN crops c ON o.crop_id = c.id
+            JOIN logistics l ON o.id = l.order_id
+            WHERE o.status != 'Cancelled & Refunded'
+            GROUP BY o.payment_id
+            ORDER BY MIN(o.id) DESC
+        ''')
+        rows = cursor.fetchall()
+        conn.close()
+
+        orders = [{
+            "payment_id": r[0],
+            "order_ids": r[1],
+            "crop": r[2],
+            "qty_kg": r[3],
+            "buyer_name": r[4],
+            "order_status": r[5],
+            "delivery_status": r[6],
+            "carrier_email": r[7],
+            "vehicle_number": r[8],
+            "driver_name": r[9],
+            "driver_phone": r[10],
+            "distance_km": r[11],
+            "multi_pickup_route": r[12],
+            "est_fuel_cost": r[13],
+            "vehicle_type": r[14]
+        } for r in rows]
+
+        return jsonify({"status": "success", "orders": orders})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/logistics/accept', methods=['POST'])
+def accept_logistics_order():
+    try:
+        data = request.get_json() or {}
+        payment_id = data.get('payment_id')
+        carrier_email = str(data.get('carrier_email', '')).strip().lower()
+        carrier_name = data.get('carrier_name', 'Logistics Partner')
+        vehicle_number = data.get('vehicle_number', 'MH-12-LG-2026')
+        driver_name = data.get('driver_name', 'Default Driver')
+        driver_phone = data.get('driver_phone', '9876543210')
+
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT l.carrier_email 
+            FROM logistics l 
+            JOIN orders o ON l.order_id = o.id 
+            WHERE o.payment_id = ? AND l.carrier_email IS NOT NULL AND l.carrier_email != ''
+        ''', (payment_id,))
+        already_accepted = cursor.fetchone()
+
+        if already_accepted:
+            conn.close()
+            return jsonify({"status": "error", "message": "Order batch already accepted by another carrier!"}), 400
+
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute('''
+            UPDATE logistics 
+            SET carrier_email = ?, carrier_name = ?, vehicle_number = ?, driver_name = ?, driver_phone = ?, delivery_status = 'Accepted - Multi-Pickup Route Active', assigned_at = ?
+            WHERE order_id IN (SELECT id FROM orders WHERE payment_id = ?)
+        ''', (carrier_email, carrier_name, vehicle_number, driver_name, driver_phone, now_str, payment_id))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({"status": "success", "message": f"Batch Order ({payment_id}) assigned to Single Truck ({vehicle_number})!"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/logistics/update-progress', methods=['POST'])
+def update_logistics_progress():
+    try:
+        data = request.get_json() or {}
+        payment_id = data.get('payment_id')
+        carrier_email = str(data.get('carrier_email', '')).strip().lower()
+        new_status = data.get('delivery_status')
+        provided_otp = str(data.get('otp', '')).strip()
+
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT l.carrier_email 
+            FROM logistics l 
+            JOIN orders o ON l.order_id = o.id 
+            WHERE o.payment_id = ?
+        ''', (payment_id,))
+        row = cursor.fetchone()
+
+        if not row or (row[0] and row[0].lower() != carrier_email):
+            conn.close()
+            return jsonify({"status": "error", "message": "Unauthorized! Only the accepting carrier can update progress."}), 403
+
+        if new_status == 'Delivered to Buyer':
+            cursor.execute('SELECT delivery_otp FROM orders WHERE payment_id = ? LIMIT 1', (payment_id,))
+            otp_row = cursor.fetchone()
+            
+            if not otp_row or str(otp_row[0]).strip() != provided_otp:
+                conn.close()
+                return jsonify({"status": "error", "message": "🔑 Invalid Customer OTP! Delivery cannot be completed without valid buyer verification."}), 400
+            
+            cursor.execute("UPDATE orders SET status = 'Delivered to Buyer' WHERE payment_id = ?", (payment_id,))
+
+        cursor.execute('''
+            UPDATE logistics 
+            SET delivery_status = ? 
+            WHERE order_id IN (SELECT id FROM orders WHERE payment_id = ?)
+        ''', (new_status, payment_id))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({"status": "success", "message": f"🎉 Batch Order verified & updated to '{new_status}'!"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# --- USER ORDERS HISTORY & TRACKING (SUPPORT FOR ALL ROLES) ---
 @app.route('/api/orders/user/<email>', methods=['GET'])
 def get_user_orders(email):
     try:
@@ -400,9 +568,11 @@ def get_user_orders(email):
 
         if role == 'farmer':
             cursor.execute('''
-                SELECT o.id, c.crop_name, o.qty_kg, o.total_price, o.buyer_name, o.buyer_email, o.payment_id, o.status, c.location, o.order_time
+                SELECT o.id, c.crop_name, o.qty_kg, o.total_price, o.buyer_name, o.buyer_email, o.payment_id, o.status, c.location, o.order_time,
+                       l.delivery_status, l.vehicle_number, l.driver_name, l.driver_phone, l.carrier_name, l.multi_pickup_route
                 FROM orders o
                 JOIN crops c ON o.crop_id = c.id
+                LEFT JOIN logistics l ON o.id = l.order_id
                 WHERE LOWER(c.farmer_name) = LOWER(?)
                 ORDER BY o.id DESC
             ''', (user_name,))
@@ -412,33 +582,103 @@ def get_user_orders(email):
             orders = [{
                 "order_id": r[0], "crop": r[1], "qty_kg": r[2], "total_price": r[3],
                 "customer_name": r[4], "customer_email": r[5], "payment_id": r[6],
-                "status": r[7], "location": r[8], "order_time": r[9]
+                "status": r[7], "location": r[8], "order_time": r[9],
+                "logistics_status": r[10] or "Order Received",
+                "vehicle_number": r[11] or "Awaiting Carrier",
+                "driver_name": r[12] or "Unassigned",
+                "driver_phone": r[13] or "-",
+                "carrier_name": r[14] or "Independent Fleet",
+                "multi_pickup_route": r[15] or ""
             } for r in rows]
 
             return jsonify({"status": "success", "role": "farmer", "orders": orders})
 
-        else:
+        elif role == 'logistics':
             cursor.execute('''
-                SELECT o.id, c.crop_name, o.qty_kg, o.total_price, c.farmer_name, o.payment_id, o.status, c.location, o.order_time
+                SELECT o.payment_id, 
+                       c.crop_name, 
+                       SUM(o.qty_kg) as total_qty, 
+                       SUM(o.total_price) as grand_total, 
+                       GROUP_CONCAT(DISTINCT c.farmer_name) as farmer_names, 
+                       o.status, 
+                       GROUP_CONCAT(DISTINCT c.location) as locations, 
+                       MIN(o.order_time) as order_time,
+                       l.delivery_status, 
+                       l.vehicle_number, 
+                       l.driver_name, 
+                       l.driver_phone, 
+                       l.carrier_name, 
+                       o.delivery_otp, 
+                       l.multi_pickup_route
                 FROM orders o
                 JOIN crops c ON o.crop_id = c.id
+                JOIN logistics l ON o.id = l.order_id
+                WHERE LOWER(l.carrier_email) = LOWER(?)
+                GROUP BY o.payment_id
+                ORDER BY MIN(o.id) DESC
+            ''', (email,))
+            rows = cursor.fetchall()
+            conn.close()
+
+            orders = [{
+                "payment_id": r[0],
+                "crop": r[1],
+                "qty_kg": r[2],
+                "total_price": r[3],
+                "farmer_name": r[4],
+                "status": r[5],
+                "location": r[6],
+                "order_time": r[7],
+                "can_cancel": False,
+                "minutes_left": 0,
+                "tracking_status": r[8] or "Accepted - Multi-Pickup Route Active",
+                "vehicle": r[9] or "Assigned Vehicle",
+                "driver_name": r[10] or "Assigned Driver",
+                "driver_phone": r[11] or "-",
+                "carrier_name": r[12] or "Transporter Fleet",
+                "delivery_otp": r[13] or "----",
+                "multi_pickup_route": r[14] or ""
+            } for r in rows]
+
+            return jsonify({"status": "success", "role": "logistics", "orders": orders})
+
+        else:
+            cursor.execute('''
+                SELECT o.payment_id, 
+                       c.crop_name, 
+                       SUM(o.qty_kg) as total_qty, 
+                       SUM(o.total_price) as grand_total, 
+                       GROUP_CONCAT(DISTINCT c.farmer_name) as farmer_names, 
+                       o.status, 
+                       GROUP_CONCAT(DISTINCT c.location) as locations, 
+                       MIN(o.order_time) as order_time,
+                       l.delivery_status, 
+                       l.vehicle_number, 
+                       l.driver_name, 
+                       l.driver_phone, 
+                       l.carrier_name, 
+                       o.delivery_otp, 
+                       l.multi_pickup_route
+                FROM orders o
+                JOIN crops c ON o.crop_id = c.id
+                LEFT JOIN logistics l ON o.id = l.order_id
                 WHERE LOWER(o.buyer_email) = LOWER(?)
-                ORDER BY o.id DESC
+                GROUP BY o.payment_id
+                ORDER BY MIN(o.id) DESC
             ''', (email,))
             rows = cursor.fetchall()
             conn.close()
 
             orders = []
             for r in rows:
-                ord_time_str = r[8]
+                ord_time_str = r[7]
                 can_cancel = False
                 minutes_left = 0
                 
-                if ord_time_str and r[6] == 'Paid & Confirmed':
+                if ord_time_str and r[5] == 'Paid & Confirmed':
                     try:
                         ord_dt = datetime.strptime(ord_time_str, "%Y-%m-%d %H:%M:%S")
                         elapsed_seconds = (now_dt - ord_dt).total_seconds()
-                        # 2 Hours (7200 seconds) Cancellation Window
                         if elapsed_seconds <= 7200:
                             can_cancel = True
                             minutes_left = max(1, int((7200 - elapsed_seconds) // 60))
@@ -446,9 +686,23 @@ def get_user_orders(email):
                         can_cancel = False
 
                 orders.append({
-                    "order_id": r[0], "crop": r[1], "qty_kg": r[2], "total_price": r[3],
-                    "farmer_name": r[4], "payment_id": r[5], "status": r[6], "location": r[7],
-                    "order_time": r[8], "can_cancel": can_cancel, "minutes_left": minutes_left
+                    "payment_id": r[0],
+                    "crop": r[1],
+                    "qty_kg": r[2],
+                    "total_price": r[3],
+                    "farmer_name": r[4],
+                    "status": r[5],
+                    "location": r[6],
+                    "order_time": r[7],
+                    "can_cancel": can_cancel,
+                    "minutes_left": minutes_left,
+                    "tracking_status": r[8] or "Order Confirmed - Preparing Pickup",
+                    "vehicle": r[9] or "Awaiting Carrier",
+                    "driver_name": r[10] or "Assigned Carrier",
+                    "driver_phone": r[11] or "-",
+                    "carrier_name": r[12] or "Partner Logistics",
+                    "delivery_otp": r[13] or "----",
+                    "multi_pickup_route": r[14] or ""
                 })
 
             return jsonify({"status": "success", "role": "buyer", "orders": orders})
@@ -456,12 +710,11 @@ def get_user_orders(email):
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# TIMED CANCELLATION & AUTOMATIC ESCROW REFUND ENDPOINT
 @app.route('/api/orders/cancel', methods=['POST'])
 def cancel_order():
     try:
         data = request.get_json() or {}
-        order_id = data.get('order_id')
+        payment_id = data.get('payment_id')
         buyer_email = str(data.get('buyer_email', '')).strip().lower()
 
         conn = sqlite3.connect(DB_NAME)
@@ -470,47 +723,48 @@ def cancel_order():
         cursor.execute('''
             SELECT id, crop_id, qty_kg, total_price, status, order_time 
             FROM orders 
-            WHERE id = ? AND LOWER(buyer_email) = ?
-        ''', (order_id, buyer_email))
-        order = cursor.fetchone()
+            WHERE payment_id = ? AND LOWER(buyer_email) = ?
+        ''', (payment_id, buyer_email))
+        order_rows = cursor.fetchall()
 
-        if not order:
+        if not order_rows:
             conn.close()
-            return jsonify({"status": "error", "message": "Order not found or unauthorized!"}), 404
+            return jsonify({"status": "error", "message": "Order batch not found or unauthorized!"}), 404
 
-        if order[4] != 'Paid & Confirmed':
+        if any(o[4] != 'Paid & Confirmed' for o in order_rows):
             conn.close()
-            return jsonify({"status": "error", "message": f"Order cannot be cancelled. Current status: {order[4]}"}), 400
+            return jsonify({"status": "error", "message": "Order batch cannot be cancelled in its current state."}), 400
 
-        # Validate 2-Hour Cancellation Window
         now_dt = datetime.now()
-        ord_time_str = order[5]
+        ord_time_str = order_rows[0][5]
         if ord_time_str:
             ord_dt = datetime.strptime(ord_time_str, "%Y-%m-%d %H:%M:%S")
             if (now_dt - ord_dt).total_seconds() > 7200:
                 conn.close()
                 return jsonify({"status": "error", "message": "⏳ Cancellation window expired (2 hours limit reached). Order has been dispatched to logistics!"}), 400
 
-        crop_id = order[1]
-        qty_kg = order[2]
-        refund_amount = order[3]
+        total_refund = 0.0
+        total_restored_kg = 0.0
 
-        # 1. Update order status to Cancelled & Refunded
-        cursor.execute('''
-            UPDATE orders SET status = 'Cancelled & Refunded' WHERE id = ?
-        ''', (order_id,))
+        for order in order_rows:
+            order_id = order[0]
+            crop_id = order[1]
+            qty_kg = order[2]
+            refund_amount = order[3]
+            
+            total_refund += refund_amount
+            total_restored_kg += qty_kg
 
-        # 2. Restore Stock to Farmer's Crop Listing
-        cursor.execute('''
-            UPDATE crops SET quantity_kg = quantity_kg + ? WHERE id = ?
-        ''', (qty_kg, crop_id))
+            cursor.execute("UPDATE orders SET status = 'Cancelled & Refunded' WHERE id = ?", (order_id,))
+            cursor.execute("UPDATE logistics SET delivery_status = 'Order Cancelled & Escrow Refunded' WHERE order_id = ?", (order_id,))
+            cursor.execute("UPDATE crops SET quantity_kg = quantity_kg + ? WHERE id = ?", (qty_kg, crop_id))
 
         conn.commit()
         conn.close()
 
         return jsonify({
             "status": "success",
-            "message": f"🎉 Order #{order_id} successfully cancelled!\n💸 Refund of ₹{refund_amount} initiated back to your source payment account.\n📦 {qty_kg} kg restored to farmer inventory."
+            "message": f"🎉 Batch Order successfully cancelled!\n💸 Total Refund of ₹{total_refund:.2f} initiated.\n📦 {total_restored_kg} kg restored to farmer inventory."
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

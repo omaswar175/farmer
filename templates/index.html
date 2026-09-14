@@ -21,7 +21,8 @@
             <a href="#home" onclick="showTab('home')">Home</a>
             <a href="#marketplace" onclick="showTab('marketplace')">Marketplace</a>
             <a href="#farmer" onclick="showTab('farmer')">Farmer Portal</a>
-            <a href="#orders" id="navOrdersTab" onclick="showTab('orders')" style="display: none;">My Orders & Sales</a>
+            <a href="#logistics" onclick="showTab('logistics')">🚛 Logistics Partner Portal</a>
+            <a href="#orders" id="navOrdersTab" onclick="showTab('orders')" style="display: none;">My Orders & Tracking</a>
             <a href="#profile" id="navProfileTab" onclick="showTab('profile')" style="display: none;">My Profile</a>
         </nav>
         <div id="navUserArea">
@@ -33,22 +34,22 @@
     <section id="tab-home" class="page-tab active">
         <div class="hero-banner">
             <div class="hero-text">
-                <h1>Connecting Farmers Directly to Wholesale Buyers</h1>
-                <p>Eliminate middleman markups. Powered by AI crop quality verification and smart logistics.</p>
+                <h1>Connecting Farmers Directly to Wholesale Buyers & Transport Carriers</h1>
+                <p>Eliminate middleman markups with AI quality checks & direct logistics dispatch.</p>
                 <div class="hero-btns">
                     <button class="btn-primary" onclick="showTab('marketplace')">Browse Marketplace</button>
-                    <button class="btn-outline" onclick="showTab('farmer')">List Farm Produce</button>
+                    <button class="btn-outline" onclick="showTab('logistics')">🚛 Logistics Partner Portal</button>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- SECTION 2: MARKETPLACE & BUYER AGGREGATOR -->
+    <!-- SECTION 2: MARKETPLACE -->
     <section id="tab-marketplace" class="page-tab">
         <div class="container">
             <div class="form-card" style="margin-bottom: 30px; border-left: 5px solid #1b5e20;">
                 <h3>🛒 Smart Buyer Requirement Aggregator</h3>
-                <p style="color: #555; font-size: 14px;">Enter large volume orders to automatically aggregate produce across multiple small farmers.</p>
+                <p style="color: #555; font-size: 14px;">Enter large volume orders to automatically aggregate produce across multiple small farmers on a single truck route.</p>
 
                 <form onsubmit="handleBuyerMatch(event)" style="margin-top: 15px;">
                     <div class="form-row">
@@ -63,7 +64,7 @@
                         </div>
                         <div class="form-group">
                             <label>Required Quantity (kg)*</label>
-                            <input type="number" id="bQty" placeholder="e.g. 1500" required>
+                            <input type="number" id="bQty" placeholder="e.g. 100" required>
                         </div>
                         <div class="form-group">
                             <label>Max Budget Price (₹/kg)*</label>
@@ -78,7 +79,7 @@
 
                 <div id="poolingSummaryBox" class="ai-inspection-result ai-success-box" style="display: none; margin-top: 20px;">
                     <div class="ai-status-header">
-                        <span class="ai-badge">🤝 Multi-Farmer Pool Verified</span>
+                        <span class="ai-badge">🤝 Single-Truck Multi-Pickup Route Verified</span>
                         <strong id="poolStatusText"></strong>
                     </div>
                     <p id="poolSummaryDetail" style="margin: 5px 0 15px 0;"></p>
@@ -153,14 +154,14 @@
                         </div>
                         <div class="form-group">
                             <label>Quantity (kg)</label>
-                            <input type="number" id="fQty" placeholder="800" required>
+                            <input type="number" id="fQty" placeholder="60" required>
                         </div>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
                             <label>Price per kg (₹)</label>
-                            <input type="number" id="fPrice" placeholder="90" required>
+                            <input type="number" id="fPrice" placeholder="25" required>
                         </div>
                         <div class="form-group">
                             <label>FPO Affiliation</label>
@@ -201,7 +202,30 @@
         </div>
     </section>
 
-    <!-- SECTION 4: MY ORDERS & SALES HISTORY -->
+    <!-- SECTION 4: SEPARATE LOGISTICS PARTNER PORTAL -->
+    <section id="tab-logistics" class="page-tab">
+        <div class="container">
+            <div id="logisticsAuthGate" class="form-card text-center" style="display: none;">
+                <h2>🚛 Registered Transporters Only</h2>
+                <p>Log in as a registered <strong>Logistics Partner</strong> to view available orders and accept single-truck multi-pickup dispatches.</p>
+                <button class="btn-primary" onclick="openModal('authModal')">Login / Register as Logistics Partner</button>
+            </div>
+
+            <div id="logisticsMainDashboard" class="form-card" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-bottom: 20px;">
+                    <h2>🚛 AI Single-Truck Multi-Pickup Logistics Pool</h2>
+                    <button class="btn-outline" style="border-color: #2e7d32; color: #2e7d32;" onclick="loadLogisticsPortal()">🔄 Refresh Available Orders</button>
+                </div>
+                <p>Logged in Carrier: <strong id="carrierNameText"></strong> (<span id="carrierEmailText"></span>)</p>
+
+                <div id="carrierOrdersContainer">
+                    <p>Loading available order dispatches...</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECTION 5: MY ORDERS & SALES HISTORY -->
     <section id="tab-orders" class="page-tab">
         <div class="container">
             <div class="form-card">
@@ -221,7 +245,7 @@
         </div>
     </section>
 
-    <!-- SECTION 5: MY PROFILE -->
+    <!-- SECTION 6: MY PROFILE -->
     <section id="tab-profile" class="page-tab">
         <div class="container">
             <div class="form-card">
@@ -234,52 +258,7 @@
                     <div class="profile-details-grid" id="profileDisplayContent">
                         <p>Loading profile details...</p>
                     </div>
-                    <div style="margin-top: 20px; display: flex; gap: 10px;">
-                        <button class="btn-primary" onclick="toggleEditProfile(true)">✏️ Edit Profile</button>
-                        <button class="btn-outline" style="border-color: #2e7d32; color: #2e7d32;" onclick="showTab('farmer')">🌾 Back to Listing Portal</button>
-                    </div>
                 </div>
-
-                <form id="profileEditForm" style="display: none;" onsubmit="handleUpdateProfile(event)">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Full Name*</label>
-                            <input type="text" id="eName" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Phone Number*</label>
-                            <input type="text" id="ePhone" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Farm Size (Acres)*</label>
-                            <input type="number" step="0.1" id="eFarmSize" required>
-                        </div>
-                        <div class="form-group">
-                            <label>District*</label>
-                            <input type="text" id="eDistrict" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>State*</label>
-                            <input type="text" id="eState" required>
-                        </div>
-                        <div class="form-group">
-                            <label>UPI ID (For Payments)*</label>
-                            <input type="text" id="eUpi" required>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>FPO / Collective Name</label>
-                        <input type="text" id="eFpo">
-                    </div>
-                    <div style="display: flex; gap: 10px; margin-top: 15px;">
-                        <button type="submit" class="btn-primary">💾 Save Profile Changes</button>
-                        <button type="button" class="btn-outline" style="border-color: #d32f2f; color: #d32f2f;" onclick="toggleEditProfile(false)">Cancel</button>
-                    </div>
-                </form>
             </div>
         </div>
     </section>
@@ -297,11 +276,12 @@
                 <div class="form-group">
                     <label>Register As</label>
                     <select id="rRole">
-                        <option value="farmer">👨‍🌾 Farmer / FPO</option>
                         <option value="buyer">🛒 Wholesale Buyer / Consumer</option>
+                        <option value="farmer">👨‍🌾 Farmer / FPO</option>
+                        <option value="logistics">🚛 Logistics Transporter / Fleet Partner</option>
                     </select>
                 </div>
-                <div class="form-group"><input type="text" id="rName" placeholder="Full Name" required></div>
+                <div class="form-group"><input type="text" id="rName" placeholder="Full Name / Fleet Name" required></div>
                 <div class="form-group"><input type="email" id="rEmail" placeholder="Email Address" required></div>
                 <div class="form-group"><input type="text" id="rPhone" placeholder="Phone Number" required></div>
                 <button type="submit" class="btn-primary full-btn">Create Account & Continue</button>
@@ -314,6 +294,52 @@
                 </div>
                 <button type="submit" class="btn-primary full-btn">Login</button>
             </form>
+        </div>
+    </div>
+
+    <!-- ACCEPTANCE DISPATCH MODAL FOR CARRIER -->
+    <div id="acceptOrderModal" class="modal">
+        <div class="modal-content" style="width: 380px;">
+            <span class="close" onclick="closeModal('acceptOrderModal')">&times;</span>
+            <h3 style="margin-top: 0; color: #1b5e20;">🚚 Accept Multi-Pickup Shipment</h3>
+            <p id="aModalOrderText" style="font-size: 13px; color: #555; margin-bottom: 15px;"></p>
+
+            <div class="form-group">
+                <label style="font-size: 13px;">Assign Single Vehicle Number*</label>
+                <input type="text" id="aVehicleNum" placeholder="e.g. MH-12-PQ-9988" required>
+            </div>
+            <div class="form-group">
+                <label style="font-size: 13px;">Assign Driver Name*</label>
+                <input type="text" id="aDriverName" placeholder="e.g. Ramesh Shinde" required>
+            </div>
+            <div class="form-group">
+                <label style="font-size: 13px;">Driver Phone Number*</label>
+                <input type="text" id="aDriverPhone" placeholder="e.g. 9876543210" required>
+            </div>
+
+            <button class="btn-primary full-btn" style="background: #2e7d32; font-size: 16px;" onclick="confirmAcceptShipment()">
+                ✅ Accept Order & Dispatch Single Truck
+            </button>
+        </div>
+    </div>
+
+    <!-- OTP VERIFICATION MODAL -->
+    <div id="otpVerificationModal" class="modal">
+        <div class="modal-content" style="width: 380px; text-align: center;">
+            <span class="close" onclick="closeModal('otpVerificationModal')">&times;</span>
+            <div style="font-size: 30px; margin-bottom: 5px;">🔑</div>
+            <h3 style="margin-top: 0; color: #1b5e20;">Customer OTP Verification</h3>
+            <p style="font-size: 13px; color: #555; margin-bottom: 15px;">
+                Ask customer for their 4-digit Delivery OTP shown in their "My Orders" app screen.
+            </p>
+
+            <div class="form-group">
+                <input type="text" id="otpInputCode" maxlength="4" placeholder="Enter 4-Digit OTP" style="font-size: 22px; letter-spacing: 5px; text-align: center;" required>
+            </div>
+
+            <button class="btn-primary full-btn" style="background: #2e7d32; font-size: 16px;" onclick="submitOtpAndCompleteDelivery()">
+                ✅ Verify OTP & Mark Delivered
+            </button>
         </div>
     </div>
 
@@ -379,6 +405,8 @@
         let uploadedImageData = null;
         let currentAggregatedPool = null;
         let selectedSingleCrop = null;
+        let selectedAcceptingPaymentId = null;
+        let selectedOtpPaymentId = null;
 
         document.addEventListener("DOMContentLoaded", () => {
             const today = new Date().toISOString().split('T')[0];
@@ -397,17 +425,14 @@
                     <button class="btn-outline" onclick="logout()">Logout</button>
                 `;
                 ordersTabLink.style.display = 'inline-block';
-                if (currentUser.role === 'farmer') {
-                    profileTabLink.style.display = 'inline-block';
-                } else {
-                    profileTabLink.style.display = 'none';
-                }
+                profileTabLink.style.display = 'inline-block';
             } else {
                 navArea.innerHTML = `<button class="btn-primary" onclick="openModal('authModal')">Login / Register</button>`;
                 profileTabLink.style.display = 'none';
                 ordersTabLink.style.display = 'none';
             }
             checkFarmerAccess();
+            checkLogisticsAccess();
         }
 
         function checkFarmerAccess() {
@@ -417,7 +442,6 @@
 
             if (currentUser && currentUser.role === 'farmer') {
                 authGate.style.display = 'none';
-                
                 if (!currentUser.is_profile_complete) {
                     profileFormCard.style.display = 'block';
                     farmerFormCard.style.display = 'none';
@@ -427,11 +451,6 @@
                     farmerFormCard.style.display = 'block';
                     document.getElementById('loggedInFarmerName').innerText = currentUser.name;
                     document.getElementById('loggedInFarmerEmail').innerText = currentUser.email;
-
-                    const locationInput = document.getElementById('fLocation');
-                    if (locationInput && currentUser.district && currentUser.state) {
-                        locationInput.value = `${currentUser.district}, ${currentUser.state}`;
-                    }
                 }
             } else {
                 authGate.style.display = 'block';
@@ -440,63 +459,185 @@
             }
         }
 
-        // OPEN DIRECT BUY MODAL FOR A SINGLE FARMER CARD
-        function openSingleBuyModal(cropObj) {
-            selectedSingleCrop = cropObj;
-            document.getElementById('sModalFarmerText').innerHTML = 
-                `Buying <strong>${cropObj.crop}</strong> directly from <strong>${cropObj.farmer}</strong> (📍 ${cropObj.location})`;
-            
-            const maxStock = cropObj.qty_kg;
-            const input = document.getElementById('sModalQtyInput');
-            input.max = maxStock;
-            input.value = Math.min(10, maxStock);
-            document.getElementById('sModalStockLimitText').innerText = `Available Stock Limit: ${maxStock} kg`;
+        function checkLogisticsAccess() {
+            const gate = document.getElementById('logisticsAuthGate');
+            const main = document.getElementById('logisticsMainDashboard');
 
-            updateSingleBuyPrice();
-            openModal('singleBuyModal');
-        }
-
-        // RECALCULATE PRICE AS USER TYPING QUANTITY
-        function updateSingleBuyPrice() {
-            if (!selectedSingleCrop) return;
-            const input = document.getElementById('sModalQtyInput');
-            let val = parseFloat(input.value) || 0;
-
-            if (val > selectedSingleCrop.qty_kg) {
-                val = selectedSingleCrop.qty_kg;
-                input.value = val;
+            if (currentUser && currentUser.role === 'logistics') {
+                gate.style.display = 'none';
+                main.style.display = 'block';
+                document.getElementById('carrierNameText').innerText = currentUser.name;
+                document.getElementById('carrierEmailText').innerText = currentUser.email;
+                loadLogisticsPortal();
+            } else {
+                gate.style.display = 'block';
+                main.style.display = 'none';
             }
-
-            const total = val * selectedSingleCrop.price;
-            document.getElementById('sModalTotalPrice').innerText = `₹${total.toFixed(2)}`;
         }
 
-        // PROCEED FROM SINGLE BUY MODAL TO PAY GATEWAY
-        function proceedSingleBuyToPayment() {
-            const qty = parseFloat(document.getElementById('sModalQtyInput').value) || 0;
-            if (qty <= 0) {
-                alert("Please enter a valid quantity!");
+        async function loadLogisticsPortal() {
+            const container = document.getElementById('carrierOrdersContainer');
+            container.innerHTML = "<p>Loading order invitations pool...</p>";
+
+            try {
+                const res = await fetch('/api/logistics/available-orders');
+                const data = await res.json();
+
+                if (res.ok && data.status === "success") {
+                    if (data.orders.length === 0) {
+                        container.innerHTML = "<p>No orders currently available in queue.</p>";
+                        return;
+                    }
+
+                    container.innerHTML = `
+                        <table class="orders-table">
+                            <thead>
+                                <tr>
+                                    <th>Order Batch</th>
+                                    <th>Produce & Payload</th>
+                                    <th>AI Single Truck Waypoint Route</th>
+                                    <th>Dist. / Est. Fuel</th>
+                                    <th>Status / Carrier</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.orders.map(o => {
+                                    const isAcceptedByMe = o.carrier_email && o.carrier_email.toLowerCase() === currentUser.email.toLowerCase();
+                                    const isUnassigned = !o.carrier_email || o.carrier_email === '';
+                                    const isDelivered = o.delivery_status === 'Delivered to Buyer';
+
+                                    let actionBtn = '';
+                                    if (isDelivered) {
+                                        actionBtn = `<span style="color:#2e7d32; font-weight:bold; font-size:12px;">✅ Order Completed</span>`;
+                                    } else if (isUnassigned) {
+                                        actionBtn = `<button class="btn-primary" style="font-size:12px; padding:6px 10px;" onclick="openAcceptModal('${o.payment_id}', '${o.crop}', ${o.qty_kg})">🤝 Accept Single-Truck Job</button>`;
+                                    } else if (isAcceptedByMe) {
+                                        actionBtn = `
+                                            <select style="font-size:12px; padding:4px;" onchange="handleMilestoneDropdownChange('${o.payment_id}', this.value, this)">
+                                                <option value="" disabled selected>Update Milestone</option>
+                                                <option value="1. Multi-Pickup Route Scheduled">1. Multi-Pickup Route Scheduled</option>
+                                                <option value="2. Picked Up from All Farmers">2. Picked Up from All Farmers</option>
+                                                <option value="3. Out for Delivery to Buyer">3. Out for Delivery to Buyer</option>
+                                                <option value="Delivered to Buyer">4. Mark Delivered to Buyer (Requires OTP)</option>
+                                            </select>
+                                        `;
+                                    } else {
+                                        actionBtn = `<span style="color:#888; font-size:12px;">Accepted by ${o.carrier_email}</span>`;
+                                    }
+
+                                    return `
+                                        <tr>
+                                            <td><strong>#${o.payment_id.replace('pay_rzp_', '')}</strong><br><small style="color:#666;">IDs: ${o.order_ids}</small></td>
+                                            <td><strong>${o.crop}</strong> (${o.qty_kg} kg Total)<br><small>Truck: ${o.vehicle_type}</small></td>
+                                            <td><div style="font-size:12px; max-width:280px; color:#1b5e20;">🚚 <strong>Waypoints:</strong> ${o.multi_pickup_route || 'Direct Delivery'}</div></td>
+                                            <td>🛣️ ${o.distance_km} km<br><small style="color:#d32f2f;">⛽ Fuel Est: ₹${o.est_fuel_cost}</small></td>
+                                            <td>
+                                                <span class="status-badge ${isDelivered ? 'green' : (isAcceptedByMe ? 'green' : (isUnassigned ? 'orange' : 'red'))}">
+                                                    ${o.delivery_status}
+                                                </span>
+                                            </td>
+                                            <td>${actionBtn}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+            } catch (err) {
+                container.innerHTML = "<p>Error connecting to logistics portal engine.</p>";
+            }
+        }
+
+        function handleMilestoneDropdownChange(paymentId, selectedValue, selectElem) {
+            if (selectedValue === 'Delivered to Buyer') {
+                selectedOtpPaymentId = paymentId;
+                document.getElementById('otpInputCode').value = '';
+                openModal('otpVerificationModal');
+                selectElem.value = "";
+            } else {
+                updateCarrierProgress(paymentId, selectedValue, "");
+            }
+        }
+
+        async function submitOtpAndCompleteDelivery() {
+            const enteredOtp = document.getElementById('otpInputCode').value.trim();
+            if (!enteredOtp || enteredOtp.length !== 4) {
+                alert("Please enter a valid 4-digit OTP!");
                 return;
             }
 
-            currentAggregatedPool = {
-                target_qty: qty,
-                fulfilled_qty: qty,
-                farmer_count: 1,
-                weighted_avg_price: selectedSingleCrop.price,
-                total_estimated_cost: qty * selectedSingleCrop.price,
-                pooled_crops: [{
-                    id: selectedSingleCrop.id,
-                    farmer: selectedSingleCrop.farmer,
-                    crop: selectedSingleCrop.crop,
-                    taken_kg: qty,
-                    price: selectedSingleCrop.price,
-                    location: selectedSingleCrop.location
-                }]
-            };
+            closeModal('otpVerificationModal');
+            await updateCarrierProgress(selectedOtpPaymentId, "Delivered to Buyer", enteredOtp);
+        }
 
-            closeModal('singleBuyModal');
-            executeRazorpayCheckout();
+        async function updateCarrierProgress(paymentId, newStatus, otpCode) {
+            try {
+                const res = await fetch('/api/logistics/update-progress', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        payment_id: paymentId,
+                        carrier_email: currentUser.email,
+                        delivery_status: newStatus,
+                        otp: otpCode
+                    })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.status === "success") {
+                    alert(data.message);
+                    loadLogisticsPortal();
+                } else {
+                    alert("⚠️ " + data.message);
+                }
+            } catch (err) {
+                alert("Error updating shipment progress.");
+            }
+        }
+
+        function openAcceptModal(paymentId, crop, qty) {
+            selectedAcceptingPaymentId = paymentId;
+            document.getElementById('aModalOrderText').innerText = `Accepting multi-pickup consolidated shipment (${qty} kg of ${crop}).`;
+            openModal('acceptOrderModal');
+        }
+
+        async function confirmAcceptShipment() {
+            const veh = document.getElementById('aVehicleNum').value;
+            const drv = document.getElementById('aDriverName').value;
+            const ph = document.getElementById('aDriverPhone').value;
+
+            if (!veh || !drv || !ph) {
+                alert("Please fill in vehicle and driver details!");
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/logistics/accept', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        payment_id: selectedAcceptingPaymentId,
+                        carrier_email: currentUser.email,
+                        carrier_name: currentUser.name,
+                        vehicle_number: veh,
+                        driver_name: drv,
+                        driver_phone: ph
+                    })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.status === "success") {
+                    closeModal('acceptOrderModal');
+                    alert("🎉 " + data.message);
+                    loadLogisticsPortal();
+                } else {
+                    alert("⚠️ " + data.message);
+                }
+            } catch (err) {
+                alert("Server error accepting shipment.");
+            }
         }
 
         async function loadUserOrders() {
@@ -505,7 +646,7 @@
             const title = document.getElementById('ordersTabTitle');
             const policyNotice = document.getElementById('ordersNoticePolicy');
             
-            content.innerHTML = "<p>Loading order history...</p>";
+            content.innerHTML = "<p>Loading orders...</p>";
 
             try {
                 const res = await fetch(`/api/orders/user/${currentUser.email}`);
@@ -513,38 +654,41 @@
 
                 if (res.ok && data.status === "success") {
                     if (data.role === 'farmer') {
-                        title.innerText = "👨‍🌾 My Crop Sales History";
+                        title.innerText = "👨‍🌾 Farmer Crop Sales History";
                         policyNotice.style.display = 'none';
 
                         if (data.orders.length === 0) {
-                            content.innerHTML = "<p>No sales recorded yet.</p>";
+                            content.innerHTML = "<p>No customer orders received yet.</p>";
                             return;
                         }
+
                         content.innerHTML = `
                             <table class="orders-table">
                                 <thead>
                                     <tr>
                                         <th>Order ID</th>
-                                        <th>Crop</th>
-                                        <th>Quantity</th>
-                                        <th>Total Revenue</th>
-                                        <th>Buyer Details</th>
-                                        <th>Payment ID</th>
-                                        <th>Status</th>
+                                        <th>Produce & Weight</th>
+                                        <th>Buyer Info</th>
+                                        <th>Revenue</th>
+                                        <th>Single-Truck Transporter</th>
+                                        <th>Current Delivery Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     ${data.orders.map(o => `
                                         <tr>
                                             <td>#${o.order_id}</td>
-                                            <td><strong>${o.crop}</strong></td>
-                                            <td>${o.qty_kg} kg</td>
+                                            <td><strong>${o.crop}</strong> (${o.qty_kg} kg)</td>
+                                            <td>${o.customer_name}<br><small>${o.customer_email}</small></td>
                                             <td class="price-text">₹${o.total_price}</td>
-                                            <td>${o.customer_name} (${o.customer_email})</td>
-                                            <td><small>${o.payment_id}</small></td>
                                             <td>
-                                                <span class="status-badge ${o.status.includes('Cancelled') ? 'red' : 'green'}">
-                                                    ${o.status}
+                                                🚛 Carrier: ${o.carrier_name}<br>
+                                                🚚 Vehicle: ${o.vehicle_number}<br>
+                                                👨‍✈️ Driver: ${o.driver_name} (${o.driver_phone})
+                                            </td>
+                                            <td>
+                                                <span class="status-badge ${o.logistics_status.includes('Delivered') ? 'green' : 'orange'}">
+                                                    ${o.logistics_status}
                                                 </span>
                                             </td>
                                         </tr>
@@ -552,64 +696,141 @@
                                 </tbody>
                             </table>
                         `;
+                    } else if (data.role === 'logistics') {
+                        title.innerText = "🚛 My Accepted Single-Truck Dispatch Jobs";
+                        policyNotice.style.display = 'none';
+
+                        if (data.orders.length === 0) {
+                            content.innerHTML = "<p>No active accepted dispatch jobs found under your account.</p>";
+                            return;
+                        }
+
+                        content.innerHTML = `
+                            <div class="orders-list-view">
+                                ${data.orders.map(o => {
+                                    const isDelivered = o.tracking_status === 'Delivered to Buyer';
+                                    const isTransit = o.tracking_status.includes('Transit') || o.tracking_status.includes('Out for');
+                                    const isPicked = o.tracking_status.includes('Pickup') || o.tracking_status.includes('Accepted') || o.tracking_status.includes('Picked Up');
+
+                                    return `
+                                        <div style="background:#fff; border:1px solid #e0e0e0; border-radius:8px; padding:20px; margin-bottom:20px;">
+                                            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">
+                                                <div>
+                                                    <h3 style="margin:0; color:#1b5e20;">Batch Order #${o.payment_id.replace('pay_rzp_', '')} - ${o.crop} (${o.qty_kg} kg Total)</h3>
+                                                    <small style="color:#666;">Farmers Origin: ${o.farmer_name} (📍 ${o.location}) | Payment ID: ${o.payment_id}</small>
+                                                </div>
+                                                <div style="text-align:right;">
+                                                    <span class="price-text" style="font-size:18px;">₹${o.total_price}</span>
+                                                </div>
+                                            </div>
+
+                                            <div style="font-size:13px; background:#f4f6f8; padding:8px 12px; border-radius:6px; margin-bottom:15px; color:#333;">
+                                                🤖 <strong>AI Optimized Route Waypoints:</strong> ${o.multi_pickup_route || 'Direct Pickup'}
+                                            </div>
+
+                                            <h4 style="margin:0 0 10px 0; color:#333;">🚚 Live Single-Truck Tracking Timeline:</h4>
+                                            
+                                            <div class="tracking-stepper">
+                                                <div class="t-step active">
+                                                    <div class="t-circle">✓</div>
+                                                    <div class="t-label">Order Confirmed</div>
+                                                </div>
+                                                <div class="t-step ${isPicked || isTransit || isDelivered ? 'active' : ''}">
+                                                    <div class="t-circle">${isPicked || isTransit || isDelivered ? '✓' : '2'}</div>
+                                                    <div class="t-label">Multi-Farmer Pickups</div>
+                                                </div>
+                                                <div class="t-step ${isTransit || isDelivered ? 'active' : ''}">
+                                                    <div class="t-circle">${isTransit || isDelivered ? '✓' : '3'}</div>
+                                                    <div class="t-label">In Transit</div>
+                                                </div>
+                                                <div class="t-step ${isDelivered ? 'active' : ''}">
+                                                    <div class="t-circle">${isDelivered ? '✓' : '4'}</div>
+                                                    <div class="t-label">Delivered</div>
+                                                </div>
+                                            </div>
+
+                                            <div style="background:#f8f9fa; padding:10px 15px; border-radius:6px; margin-top:15px; font-size:13px; display:flex; justify-content:space-between; align-items:center;">
+                                                <span><strong>Logistics Carrier:</strong> ${o.carrier_name}</span>
+                                                <span><strong>Status:</strong> ${o.tracking_status}</span>
+                                                <span><strong>Driver / Vehicle:</strong> ${o.driver_name} (${o.vehicle})</span>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        `;
                     } else {
-                        title.innerText = "🛒 My Purchase History";
+                        title.innerText = "🛒 My Orders & Live Logistics Tracking";
                         policyNotice.style.display = 'block';
 
                         if (data.orders.length === 0) {
                             content.innerHTML = "<p>No orders placed yet.</p>";
                             return;
                         }
-                        content.innerHTML = `
-                            <table class="orders-table">
-                                <thead>
-                                    <tr>
-                                        <th>Order ID</th>
-                                        <th>Crop</th>
-                                        <th>Quantity</th>
-                                        <th>Total Paid</th>
-                                        <th>Farmer / Origin</th>
-                                        <th>Payment ID</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${data.orders.map(o => {
-                                        let actionTd = '';
-                                        if (o.status === 'Paid & Confirmed') {
-                                            if (o.can_cancel) {
-                                                actionTd = `
-                                                    <button class="btn-cancel-order" onclick="cancelBuyerOrder(${o.order_id})">
-                                                        🚫 Cancel & Refund (${o.minutes_left}m left)
-                                                    </button>
-                                                `;
-                                            } else {
-                                                actionTd = `<span style="color:#888; font-size:12px;">🚚 Window Expired (Dispatched)</span>`;
-                                            }
-                                        } else {
-                                            actionTd = `<span style="color:#d32f2f; font-weight:bold; font-size:12px;">💸 Refunded</span>`;
-                                        }
 
-                                        return `
-                                            <tr>
-                                                <td>#${o.order_id}</td>
-                                                <td><strong>${o.crop}</strong></td>
-                                                <td>${o.qty_kg} kg</td>
-                                                <td class="price-text">₹${o.total_price}</td>
-                                                <td>${o.farmer_name} (📍 ${o.location})</td>
-                                                <td><small>${o.payment_id}</small></td>
-                                                <td>
-                                                    <span class="status-badge ${o.status.includes('Cancelled') ? 'red' : 'green'}">
-                                                        ${o.status}
-                                                    </span>
-                                                </td>
-                                                <td>${actionTd}</td>
-                                            </tr>
-                                        `;
-                                    }).join('')}
-                                </tbody>
-                            </table>
+                        content.innerHTML = `
+                            <div class="orders-list-view">
+                                ${data.orders.map(o => {
+                                    const isDelivered = o.tracking_status === 'Delivered to Buyer';
+                                    const isTransit = o.tracking_status.includes('Transit') || o.tracking_status.includes('Out for');
+                                    const isPicked = o.tracking_status.includes('Pickup') || o.tracking_status.includes('Accepted') || o.tracking_status.includes('Picked Up');
+
+                                    return `
+                                        <div style="background:#fff; border:1px solid #e0e0e0; border-radius:8px; padding:20px; margin-bottom:20px;">
+                                            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">
+                                                <div>
+                                                    <h3 style="margin:0; color:#1b5e20;">Batch Order #${o.payment_id.replace('pay_rzp_', '')} - ${o.crop} (${o.qty_kg} kg Total)</h3>
+                                                    <small style="color:#666;">Farmers Origin: ${o.farmer_name} (📍 ${o.location}) | Payment ID: ${o.payment_id}</small>
+                                                </div>
+                                                <div style="text-align:right;">
+                                                    <span class="price-text" style="font-size:18px;">₹${o.total_price}</span>
+                                                    ${o.status === 'Paid & Confirmed' && o.can_cancel ? `
+                                                        <br><button class="btn-cancel-order" style="margin-top:5px;" onclick="cancelBuyerOrder('${o.payment_id}')">
+                                                            🚫 Cancel Order (${o.minutes_left}m left)
+                                                        </button>
+                                                    ` : ''}
+                                                </div>
+                                            </div>
+
+                                            <div style="display:flex; justify-content:space-between; align-items:center; background:#e8f5e9; padding:10px 15px; border-radius:6px; margin-bottom:15px;">
+                                                <span style="font-size:13px; color:#1b5e20;"><strong>🔑 Delivery Verification OTP:</strong> Give this code to driver upon arrival</span>
+                                                <span style="font-size:18px; font-weight:bold; letter-spacing:3px; background:#fff; padding:4px 12px; border-radius:4px; border:1px solid #c8e6c9; color:#2e7d32;">${o.delivery_otp}</span>
+                                            </div>
+
+                                            <div style="font-size:13px; background:#f4f6f8; padding:8px 12px; border-radius:6px; margin-bottom:15px; color:#333;">
+                                                🤖 <strong>AI Optimized Route Waypoints:</strong> ${o.multi_pickup_route || 'Direct Pickup'}
+                                            </div>
+
+                                            <h4 style="margin:0 0 10px 0; color:#333;">🚚 Live Single-Truck Tracking Timeline:</h4>
+                                            
+                                            <div class="tracking-stepper">
+                                                <div class="t-step active">
+                                                    <div class="t-circle">✓</div>
+                                                    <div class="t-label">Order Confirmed</div>
+                                                </div>
+                                                <div class="t-step ${isPicked || isTransit || isDelivered ? 'active' : ''}">
+                                                    <div class="t-circle">${isPicked || isTransit || isDelivered ? '✓' : '2'}</div>
+                                                    <div class="t-label">Multi-Farmer Pickups</div>
+                                                </div>
+                                                <div class="t-step ${isTransit || isDelivered ? 'active' : ''}">
+                                                    <div class="t-circle">${isTransit || isDelivered ? '✓' : '3'}</div>
+                                                    <div class="t-label">In Transit</div>
+                                                </div>
+                                                <div class="t-step ${isDelivered ? 'active' : ''}">
+                                                    <div class="t-circle">${isDelivered ? '✓' : '4'}</div>
+                                                    <div class="t-label">Delivered</div>
+                                                </div>
+                                            </div>
+
+                                            <div style="background:#f8f9fa; padding:10px 15px; border-radius:6px; margin-top:15px; font-size:13px; display:flex; justify-content:space-between; align-items:center;">
+                                                <span><strong>Logistics Carrier:</strong> ${o.carrier_name}</span>
+                                                <span><strong>Status:</strong> ${o.tracking_status}</span>
+                                                <span><strong>Driver / Vehicle:</strong> ${o.driver_name} (${o.vehicle})</span>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
                         `;
                     }
                 } else {
@@ -620,15 +841,15 @@
             }
         }
 
-        async function cancelBuyerOrder(orderId) {
-            if (!confirm(`Are you sure you want to cancel Order #${orderId}?\n\nThis will initiate an immediate 100% refund and restore produce stock to the farmer.`)) return;
+        async function cancelBuyerOrder(paymentId) {
+            if (!confirm(`Are you sure you want to cancel this Order Batch?\n\nThis will initiate an immediate 100% refund and restore produce stock to the farmers.`)) return;
 
             try {
                 const res = await fetch('/api/orders/cancel', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        order_id: orderId,
+                        payment_id: paymentId,
                         buyer_email: currentUser.email
                     })
                 });
@@ -643,6 +864,232 @@
             } catch (err) {
                 alert("Server error processing cancellation.");
             }
+        }
+
+        function openSingleBuyModal(cropObj) {
+            // LOGIN GATE: Protect guest users from initiating direct purchases
+            if (!currentUser) {
+                alert("🔒 Please Login or Register first to purchase produce from the marketplace.");
+                openModal('authModal');
+                return;
+            }
+
+            selectedSingleCrop = cropObj;
+            document.getElementById('sModalFarmerText').innerHTML = 
+                `Buying <strong>${cropObj.crop}</strong> directly from <strong>${cropObj.farmer}</strong> (📍 ${cropObj.location})`;
+            
+            const maxStock = cropObj.stock_kg || cropObj.qty_kg;
+            const input = document.getElementById('sModalQtyInput');
+            input.max = maxStock;
+            input.value = Math.min(10, maxStock);
+            document.getElementById('sModalStockLimitText').innerText = `Available Stock Limit: ${maxStock} kg`;
+
+            updateSingleBuyPrice();
+            openModal('singleBuyModal');
+        }
+
+        function updateSingleBuyPrice() {
+            if (!selectedSingleCrop) return;
+            const input = document.getElementById('sModalQtyInput');
+            let val = parseFloat(input.value) || 0;
+            const maxStock = selectedSingleCrop.stock_kg || selectedSingleCrop.qty_kg;
+
+            if (val > maxStock) {
+                val = maxStock;
+                input.value = maxStock;
+            }
+
+            const total = val * selectedSingleCrop.price;
+            document.getElementById('sModalTotalPrice').innerText = `₹${total.toFixed(2)}`;
+        }
+
+        function proceedSingleBuyToPayment() {
+            const inputQty = parseFloat(document.getElementById('sModalQtyInput').value) || 0;
+            const maxStock = selectedSingleCrop.stock_kg || selectedSingleCrop.qty_kg;
+            
+            if (inputQty <= 0) {
+                alert("Please enter a valid quantity!");
+                return;
+            }
+
+            const actualQty = Math.min(inputQty, maxStock);
+
+            currentAggregatedPool = {
+                target_qty: actualQty,
+                fulfilled_qty: actualQty,
+                farmer_count: 1,
+                weighted_avg_price: selectedSingleCrop.price,
+                total_estimated_cost: actualQty * selectedSingleCrop.price,
+                pooled_crops: [{
+                    id: selectedSingleCrop.id,
+                    farmer: selectedSingleCrop.farmer,
+                    crop: selectedSingleCrop.crop,
+                    taken_kg: actualQty,
+                    price: selectedSingleCrop.price,
+                    location: selectedSingleCrop.location
+                }]
+            };
+
+            closeModal('singleBuyModal');
+            executeRazorpayCheckout();
+        }
+
+        async function handleBuyerMatch(e) {
+            e.preventDefault();
+            const payload = {
+                crop_name: document.getElementById('bCrop').value,
+                quantity_kg: parseFloat(document.getElementById('bQty').value),
+                max_price: parseFloat(document.getElementById('bMaxPrice').value)
+            };
+
+            try {
+                const res = await fetch('/api/buyer/smart-match', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                const box = document.getElementById('poolingSummaryBox');
+
+                if (data.status === "success") {
+                    currentAggregatedPool = data;
+                    box.style.display = 'block';
+                    
+                    if (data.is_fully_met) {
+                        box.className = "ai-inspection-result ai-success-box";
+                        document.getElementById('poolStatusText').innerText = `Full Match: 100% Fulfilled (${data.fulfilled_qty} kg)`;
+                        document.getElementById('poolSummaryDetail').innerText = 
+                            `Pooled stock from ${data.farmer_count} farmer(s) on a single truck at weighted avg rate ₹${data.weighted_avg_price}/kg. Total: ₹${data.total_estimated_cost}`;
+                    } else {
+                        box.className = "ai-inspection-result ai-error-box";
+                        document.getElementById('poolStatusText').innerText = `Partial Match: ${data.fulfilled_qty} kg of ${data.target_qty} kg found`;
+                        document.getElementById('poolSummaryDetail').innerText = 
+                            `Aggregated ${data.farmer_count} available farmer(s). Short by ${data.target_qty - data.fulfilled_qty} kg. Total estimate: ₹${data.total_estimated_cost}`;
+                    }
+
+                    renderMarketplaceCards(data.pooled_crops, true);
+                } else {
+                    currentAggregatedPool = null;
+                    box.style.display = 'block';
+                    box.className = "ai-inspection-result ai-error-box";
+                    document.getElementById('poolStatusText').innerText = "No Match Found";
+                    document.getElementById('poolSummaryDetail').innerText = data.message;
+                    document.getElementById('productGrid').innerHTML = `<p class="text-center">No listings matching your bulk requirement.</p>`;
+                }
+            } catch (err) {
+                alert("Server error running aggregation engine.");
+            }
+        }
+
+        function executeRazorpayCheckout() {
+            // LOGIN GATE: Protect guest users from completing pooled purchases
+            if (!currentUser) {
+                alert("🔒 Please Login or Register first to complete your purchase.");
+                openModal('authModal');
+                return;
+            }
+
+            if (!currentAggregatedPool || !currentAggregatedPool.pooled_crops) {
+                alert("No active requirement pooled!");
+                return;
+            }
+            
+            document.getElementById('payQtyText').innerText = currentAggregatedPool.fulfilled_qty;
+            document.getElementById('payAmountText').innerText = `₹${currentAggregatedPool.total_estimated_cost}`;
+            openModal('paymentModal');
+        }
+
+        async function confirmDemoPayment() {
+            const btn = document.getElementById('confirmPayBtn');
+            btn.innerText = "⏳ Processing Payment & Escrow Lock...";
+            btn.disabled = true;
+
+            const buyerName = currentUser ? currentUser.name : "Wholesale Buyer";
+            const buyerEmail = currentUser ? currentUser.email : "buyer@example.com";
+            const mockPayId = `pay_rzp_${Math.floor(Math.random() * 899999 + 100000)}`;
+
+            try {
+                const orderRes = await fetch('/api/orders/place', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        buyer_name: buyerName,
+                        buyer_email: buyerEmail,
+                        payment_id: mockPayId,
+                        pooled_items: currentAggregatedPool.pooled_crops
+                    })
+                });
+
+                const orderData = await orderRes.json();
+                if (orderRes.ok && orderData.status === "success") {
+                    closeModal('paymentModal');
+                    alert(`🎉 Payment Successful!\n${orderData.message}\nOrder saved to your account!`);
+                    loadMarketplace();
+                    showTab('orders');
+                } else {
+                    alert("⚠️ " + orderData.message);
+                }
+            } catch (err) {
+                alert("Server error completing purchase.");
+            } finally {
+                btn.innerText = "🔒 Confirm & Pay Now";
+                btn.disabled = false;
+            }
+        }
+
+        function renderMarketplaceCards(crops, isPooled = false) {
+            const grid = document.getElementById('productGrid');
+            if (!crops || crops.length === 0) {
+                grid.innerHTML = `<p>No listings found.</p>`;
+                return;
+            }
+
+            grid.innerHTML = crops.map(c => {
+                const isOwner = currentUser && currentUser.role === 'farmer' && 
+                                currentUser.name.trim().toLowerCase() === c.farmer.trim().toLowerCase();
+                
+                const cropJsonStr = JSON.stringify(c).replace(/"/g, '&quot;');
+
+                return `
+                    <div class="product-card">
+                        <img src="${c.image}" alt="${c.crop}">
+                        <div class="card-details">
+                            <span class="badge">${c.fpo}</span>
+                            <span class="badge ai-pass-badge">✓ AI Passed: ${c.quality_grade}</span>
+                            <h3>${c.crop}</h3>
+                            <p class="farmer-tag">📍 ${c.location} | By ${c.farmer}</p>
+                            ${isPooled ? `<p style="color:#2e7d32; font-weight:bold; font-size:13px; margin:4px 0;">📦 Contributes: ${c.taken_kg} kg to order</p>` : ''}
+                            <div class="meta-dates">
+                                <small>🌾 Harvested: ${c.harvest_date}</small><br>
+                                <small>📅 Published: ${c.publish_date}</small>
+                            </div>
+                            <div class="card-footer">
+                                <span class="price">₹${c.price} <small>/ kg</small></span>
+                                <span class="stock">${c.stock_kg || c.qty_kg} kg stock</span>
+                            </div>
+
+                            ${!isOwner ? `
+                                <button class="btn-buy-direct" onclick='openSingleBuyModal(${cropJsonStr})'>
+                                    ⚡ Buy Direct
+                                </button>
+                            ` : `
+                                <button class="btn-delete-listing" onclick="deleteCropListing(${c.id})">
+                                    🗑️ Delete My Listing
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadMarketplace() {
+            document.getElementById('poolingSummaryBox').style.display = 'none';
+            currentAggregatedPool = null;
+            const res = await fetch('/api/crops/list');
+            const data = await res.json();
+            renderMarketplaceCards(data.crops, false);
         }
 
         async function loadFarmerProfile() {
@@ -670,74 +1117,14 @@
                                 <input type="text" value="${p.phone}" disabled readonly>
                             </div>
                             <div class="form-group">
-                                <label>Farm Size (Acres)</label>
-                                <input type="text" value="${p.farm_size} Acres" disabled readonly>
+                                <label>Role</label>
+                                <input type="text" value="${p.role.toUpperCase()}" disabled readonly>
                             </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Location (District, State)</label>
-                                <input type="text" value="${p.district}, ${p.state}" disabled readonly>
-                            </div>
-                            <div class="form-group">
-                                <label>Linked UPI ID (Escrow Payment)</label>
-                                <input type="text" value="${p.upi_id}" disabled readonly>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>FPO / Collective Affiliation</label>
-                            <input type="text" value="${p.fpo || 'Independent Farmer'}" disabled readonly>
                         </div>
                     `;
-
-                    document.getElementById('eName').value = p.name;
-                    document.getElementById('ePhone').value = p.phone;
-                    document.getElementById('eFarmSize').value = p.farm_size;
-                    document.getElementById('eDistrict').value = p.district;
-                    document.getElementById('eState').value = p.state;
-                    document.getElementById('eUpi').value = p.upi_id;
-                    document.getElementById('eFpo').value = p.fpo || '';
                 }
             } catch (err) {
                 console.error("Error loading profile:", err);
-            }
-        }
-
-        function toggleEditProfile(isEditing) {
-            document.getElementById('profileViewContainer').style.display = isEditing ? 'none' : 'block';
-            document.getElementById('profileEditForm').style.display = isEditing ? 'block' : 'none';
-        }
-
-        async function handleUpdateProfile(e) {
-            e.preventDefault();
-            const payload = {
-                email: currentUser.email,
-                name: document.getElementById('eName').value,
-                phone: document.getElementById('ePhone').value,
-                farm_size: parseFloat(document.getElementById('eFarmSize').value),
-                district: document.getElementById('eDistrict').value,
-                state: document.getElementById('eState').value,
-                upi_id: document.getElementById('eUpi').value,
-                fpo: document.getElementById('eFpo').value
-            };
-
-            const res = await fetch('/api/farmer/profile/update', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if (res.ok && data.status === "success") {
-                currentUser.name = payload.name;
-                currentUser.district = payload.district;
-                currentUser.state = payload.state;
-                localStorage.setItem('agri_user', JSON.stringify(currentUser));
-                alert("🎉 " + data.message);
-                toggleEditProfile(false);
-                updateUIState();
-                loadFarmerProfile();
-            } else {
-                alert("❌ " + data.message);
             }
         }
 
@@ -746,6 +1133,7 @@
             document.getElementById(`tab-${tabId}`).classList.add('active');
             if (tabId === 'farmer') checkFarmerAccess();
             if (tabId === 'marketplace') loadMarketplace();
+            if (tabId === 'logistics') checkLogisticsAccess();
             if (tabId === 'profile') loadFarmerProfile();
             if (tabId === 'orders') loadUserOrders();
         }
@@ -795,13 +1183,9 @@
                     updateUIState();
                     closeModal('authModal');
                     alert("🎉 " + data.message);
-                    showTab('farmer');
+                    showTab(currentUser.role === 'logistics' ? 'logistics' : 'farmer');
                 } else {
                     alert("⚠️ " + (data.message || "Registration failed"));
-                    if (data.message && data.message.includes("already registered")) {
-                        toggleAuthMode('login');
-                        document.getElementById('lEmail').value = payload.email;
-                    }
                 }
             } catch (err) {
                 alert("Server connection error.");
@@ -826,7 +1210,7 @@
                     localStorage.setItem('agri_user', JSON.stringify(currentUser));
                     updateUIState();
                     closeModal('authModal');
-                    showTab('farmer');
+                    showTab(currentUser.role === 'logistics' ? 'logistics' : 'farmer');
                 } else {
                     alert("⚠️ " + (data.message || "Login failed"));
                 }
@@ -980,187 +1364,6 @@
             } catch (err) {
                 alert("Server error occurred while publishing.");
             }
-        }
-
-        async function deleteCropListing(cropId) {
-            if (!currentUser || currentUser.role !== 'farmer') {
-                alert("🔒 Only logged in farmers can delete listings!");
-                return;
-            }
-
-            if (!confirm("Are you sure you want to delete this produce listing from the marketplace?")) return;
-
-            try {
-                const res = await fetch('/api/crops/delete', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        crop_id: cropId,
-                        farmer_email: currentUser.email
-                    })
-                });
-
-                const data = await res.json();
-                if (res.ok && data.status === "success") {
-                    alert("🗑️ " + data.message);
-                    loadMarketplace();
-                } else {
-                    alert(data.message);
-                }
-            } catch (err) {
-                alert("Failed to connect to server.");
-            }
-        }
-
-        async function handleBuyerMatch(e) {
-            e.preventDefault();
-            const payload = {
-                crop_name: document.getElementById('bCrop').value,
-                quantity_kg: parseFloat(document.getElementById('bQty').value),
-                max_price: parseFloat(document.getElementById('bMaxPrice').value)
-            };
-
-            try {
-                const res = await fetch('/api/buyer/smart-match', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await res.json();
-                const box = document.getElementById('poolingSummaryBox');
-
-                if (data.status === "success") {
-                    currentAggregatedPool = data;
-                    box.style.display = 'block';
-                    
-                    if (data.is_fully_met) {
-                        box.className = "ai-inspection-result ai-success-box";
-                        document.getElementById('poolStatusText').innerText = `Full Match: 100% Fulfilled (${data.fulfilled_qty} kg)`;
-                        document.getElementById('poolSummaryDetail').innerText = 
-                            `Pooled stock from ${data.farmer_count} farmer(s) at weighted avg rate ₹${data.weighted_avg_price}/kg. Total: ₹${data.total_estimated_cost}`;
-                    } else {
-                        box.className = "ai-inspection-result ai-error-box";
-                        document.getElementById('poolStatusText').innerText = `Partial Match: ${data.fulfilled_qty} kg of ${data.target_qty} kg found`;
-                        document.getElementById('poolSummaryDetail').innerText = 
-                            `Aggregated ${data.farmer_count} available farmer(s). Short by ${data.target_qty - data.fulfilled_qty} kg. Total estimate: ₹${data.total_estimated_cost}`;
-                    }
-
-                    renderMarketplaceCards(data.pooled_crops, true);
-                } else {
-                    currentAggregatedPool = null;
-                    box.style.display = 'block';
-                    box.className = "ai-inspection-result ai-error-box";
-                    document.getElementById('poolStatusText').innerText = "No Match Found";
-                    document.getElementById('poolSummaryDetail').innerText = data.message;
-                    document.getElementById('productGrid').innerHTML = `<p class="text-center">No listings matching your bulk requirement.</p>`;
-                }
-            } catch (err) {
-                alert("Server error running aggregation engine.");
-            }
-        }
-
-        function executeRazorpayCheckout() {
-            if (!currentAggregatedPool || !currentAggregatedPool.pooled_crops) {
-                alert("No active requirement pooled!");
-                return;
-            }
-            
-            document.getElementById('payQtyText').innerText = currentAggregatedPool.fulfilled_qty;
-            document.getElementById('payAmountText').innerText = `₹${currentAggregatedPool.total_estimated_cost}`;
-            openModal('paymentModal');
-        }
-
-        async function confirmDemoPayment() {
-            const btn = document.getElementById('confirmPayBtn');
-            btn.innerText = "⏳ Processing Payment & Escrow Lock...";
-            btn.disabled = true;
-
-            const buyerName = currentUser ? currentUser.name : "Wholesale Buyer";
-            const buyerEmail = currentUser ? currentUser.email : "buyer@example.com";
-            const mockPayId = `pay_rzp_${Math.floor(Math.random() * 899999 + 100000)}`;
-
-            try {
-                const orderRes = await fetch('/api/orders/place', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        buyer_name: buyerName,
-                        buyer_email: buyerEmail,
-                        payment_id: mockPayId,
-                        pooled_items: currentAggregatedPool.pooled_crops
-                    })
-                });
-
-                const orderData = await orderRes.json();
-                if (orderRes.ok && orderData.status === "success") {
-                    closeModal('paymentModal');
-                    alert(`🎉 Payment Successful!\n${orderData.message}\nOrder saved to your account!`);
-                    loadMarketplace();
-                    showTab('orders');
-                } else {
-                    alert("⚠️ " + orderData.message);
-                }
-            } catch (err) {
-                alert("Server error completing purchase.");
-            } finally {
-                btn.innerText = "🔒 Confirm & Pay Now";
-                btn.disabled = false;
-            }
-        }
-
-        function renderMarketplaceCards(crops, isPooled = false) {
-            const grid = document.getElementById('productGrid');
-            if (!crops || crops.length === 0) {
-                grid.innerHTML = `<p>No listings found.</p>`;
-                return;
-            }
-
-            grid.innerHTML = crops.map(c => {
-                const isOwner = currentUser && currentUser.role === 'farmer' && 
-                                currentUser.name.trim().toLowerCase() === c.farmer.trim().toLowerCase();
-                
-                const cropJsonStr = JSON.stringify(c).replace(/"/g, '&quot;');
-
-                return `
-                    <div class="product-card">
-                        <img src="${c.image}" alt="${c.crop}">
-                        <div class="card-details">
-                            <span class="badge">${c.fpo}</span>
-                            <span class="badge ai-pass-badge">✓ AI Passed: ${c.quality_grade}</span>
-                            <h3>${c.crop}</h3>
-                            <p class="farmer-tag">📍 ${c.location} | By ${c.farmer}</p>
-                            ${isPooled ? `<p style="color:#2e7d32; font-weight:bold; font-size:13px; margin:4px 0;">📦 Contributes: ${c.taken_kg} kg to order</p>` : ''}
-                            <div class="meta-dates">
-                                <small>🌾 Harvested: ${c.harvest_date}</small><br>
-                                <small>📅 Published: ${c.publish_date}</small>
-                            </div>
-                            <div class="card-footer">
-                                <span class="price">₹${c.price} <small>/ kg</small></span>
-                                <span class="stock">${c.stock_kg || c.qty_kg} kg stock</span>
-                            </div>
-
-                            ${!isOwner ? `
-                                <button class="btn-buy-direct" onclick='openSingleBuyModal(${cropJsonStr})'>
-                                    ⚡ Buy Direct
-                                </button>
-                            ` : `
-                                <button class="btn-delete-listing" onclick="deleteCropListing(${c.id})">
-                                    🗑️ Delete My Listing
-                                </button>
-                            `}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        async function loadMarketplace() {
-            document.getElementById('poolingSummaryBox').style.display = 'none';
-            currentAggregatedPool = null;
-            const res = await fetch('/api/crops/list');
-            const data = await res.json();
-            renderMarketplaceCards(data.crops, false);
         }
 
         updateUIState();
