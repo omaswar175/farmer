@@ -24,16 +24,46 @@ def init_db():
             district TEXT DEFAULT '',
             state TEXT DEFAULT '',
             upi_id TEXT DEFAULT '',
-            is_profile_complete INTEGER DEFAULT 0
+            is_profile_complete INTEGER DEFAULT 0,
+            address TEXT DEFAULT '',
+            pincode TEXT DEFAULT '',
+            cultivation_details TEXT DEFAULT '',
+            vehicle_types TEXT DEFAULT '',
+            fleet_size INTEGER DEFAULT 1,
+            preferred_payment TEXT DEFAULT 'UPI'
         )
     ''')
 
+    # Safe Schema Migration Check
+    cursor.execute("PRAGMA table_info(users)")
+    user_cols = [c[1] for c in cursor.fetchall()]
+    new_cols = {
+        "address": "TEXT DEFAULT ''",
+        "pincode": "TEXT DEFAULT ''",
+        "cultivation_details": "TEXT DEFAULT ''",
+        "vehicle_types": "TEXT DEFAULT ''",
+        "fleet_size": "INTEGER DEFAULT 1",
+        "preferred_payment": "TEXT DEFAULT 'UPI'"
+    }
+    for col, col_type in new_cols.items():
+        if col not in user_cols:
+            cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {col_type}")
+
+    # Seed System Admin User (Hidden from Registration)
+    cursor.execute('SELECT COUNT(*) FROM users WHERE role = "admin"')
+    if cursor.fetchone()[0] == 0:
+        cursor.execute('''
+            INSERT INTO users (role, name, email, phone, details, is_profile_complete)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', ("admin", "System Administrator", "admin@agrilink.com", "9999999999", "AgriLink HQ", 1))
+
+    # Seed Default Farmer
     cursor.execute('SELECT COUNT(*) FROM users WHERE role = "farmer"')
     if cursor.fetchone()[0] == 0:
         cursor.execute('''
-            INSERT INTO users (role, name, email, phone, details, farm_size_acres, district, state, upi_id, is_profile_complete)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', ("farmer", "SHERA", "shera29@gmail.com", "9876543210", "Pune Agro FPO", 5.0, "Pune", "Maharashtra", "shera@upi", 1))
+            INSERT INTO users (role, name, email, phone, details, farm_size_acres, district, state, upi_id, is_profile_complete, address, cultivation_details)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', ("farmer", "SHERA", "shera29@gmail.com", "9876543210", "Pune Agro FPO", 5.0, "Pune", "Maharashtra", "shera@upi", 1, "Farm No 42, Haveli", "Potatoes, Tomatoes (Kharif/Rabi)"))
 
     # 2. Crops Table
     cursor.execute('''
@@ -89,29 +119,12 @@ def init_db():
         )
     ''')
 
-    # Safe Schema Auto-Migration
-    cursor.execute("PRAGMA table_info(logistics)")
-    logistics_cols = [c[1] for c in cursor.fetchall()]
-    if "carrier_email" not in logistics_cols:
-        cursor.execute("ALTER TABLE logistics ADD COLUMN carrier_email TEXT DEFAULT ''")
-    if "carrier_name" not in logistics_cols:
-        cursor.execute("ALTER TABLE logistics ADD COLUMN carrier_name TEXT DEFAULT ''")
-    if "multi_pickup_route" not in logistics_cols:
-        cursor.execute("ALTER TABLE logistics ADD COLUMN multi_pickup_route TEXT DEFAULT ''")
-    if "est_fuel_cost" not in logistics_cols:
-        cursor.execute("ALTER TABLE logistics ADD COLUMN est_fuel_cost REAL DEFAULT 0.0")
-
-    cursor.execute("PRAGMA table_info(orders)")
-    order_cols = [c[1] for c in cursor.fetchall()]
-    if "delivery_otp" not in order_cols:
-        cursor.execute("ALTER TABLE orders ADD COLUMN delivery_otp TEXT NOT NULL DEFAULT '1234'")
-
     conn.commit()
     conn.close()
 
 init_db()
 
-# --- AUTHENTICATION & USER ROUTES ---
+# --- AUTHENTICATION & USER PROFILE ROUTES ---
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -122,8 +135,12 @@ def register():
         data = request.get_json() or {}
         email = str(data.get('email', '')).strip().lower()
         name = str(data.get('name', '')).strip()
-        role = str(data.get('role', 'farmer')).strip()
+        role = str(data.get('role', 'buyer')).strip()
         phone = str(data.get('phone', '')).strip()
+
+        # Security check: Prevent registering as admin via standard registration form
+        if role == 'admin':
+            return jsonify({"status": "error", "message": "Unauthorized role selection!"}), 403
 
         if not email or not name:
             return jsonify({"status": "error", "message": "Name and Email are required!"}), 400
@@ -136,11 +153,10 @@ def register():
             conn.close()
             return jsonify({"status": "error", "message": "Email is already registered!"}), 400
 
-        is_complete = 1 if role != 'farmer' else 0
         cursor.execute('''
             INSERT INTO users (role, name, email, phone, details, is_profile_complete) 
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (role, name, email, phone, data.get('details', ''), is_complete))
+            VALUES (?, ?, ?, ?, ?, 1)
+        ''', (role, name, email, phone, data.get('details', '')))
         
         conn.commit()
         user_id = cursor.lastrowid
@@ -149,7 +165,7 @@ def register():
         return jsonify({
             "status": "success", 
             "message": f"Registered successfully as {role.upper()}!",
-            "user": {"id": user_id, "name": name, "email": email, "role": role, "is_profile_complete": is_complete}
+            "user": {"id": user_id, "name": name, "email": email, "role": role, "is_profile_complete": 1}
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -162,7 +178,7 @@ def login():
         
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute('SELECT id, name, email, role, is_profile_complete, farm_size_acres, district, state, upi_id FROM users WHERE LOWER(email) = ?', (email,))
+        cursor.execute('SELECT id, name, email, role, is_profile_complete FROM users WHERE LOWER(email) = ?', (email,))
         user = cursor.fetchone()
         conn.close()
 
@@ -171,39 +187,123 @@ def login():
                 "status": "success",
                 "user": {
                     "id": user[0], "name": user[1], "email": user[2], "role": user[3],
-                    "is_profile_complete": user[4], "farm_size": user[5], 
-                    "district": user[6], "state": user[7], "upi_id": user[8]
+                    "is_profile_complete": user[4]
                 }
             })
         return jsonify({"status": "error", "message": "Account not found!"}), 404
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/api/farmer/profile', methods=['POST'])
-def save_profile():
-    data = request.get_json() or {}
-    email = str(data.get('email', '')).strip().lower()
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE users 
-        SET farm_size_acres = ?, district = ?, state = ?, upi_id = ?, details = ?, is_profile_complete = 1
-        WHERE LOWER(email) = ? AND role = 'farmer'
-    ''', (data.get('farm_size', 0), data.get('district', ''), data.get('state', ''), data.get('upi_id', ''), data.get('fpo_name', ''), email))
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "success", "message": "Profile updated!"})
+# --- ADMIN API ROUTES ---
+@app.route('/api/admin/all-data', methods=['GET'])
+def get_admin_data():
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
 
-@app.route('/api/farmer/profile/<email>', methods=['GET'])
-def get_farmer_profile(email):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute('SELECT name, email, phone, role, farm_size_acres, district, state, upi_id, details, is_profile_complete FROM users WHERE LOWER(email) = LOWER(?)', (email.strip(),))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return jsonify({"status": "success", "profile": {"name": row[0], "email": row[1], "phone": row[2], "role": row[3], "farm_size": row[4], "district": row[5], "state": row[6], "upi_id": row[7], "fpo": row[8], "is_profile_complete": row[9]}})
-    return jsonify({"status": "error", "message": "Not found"}), 404
+        # Fetch all users
+        cursor.execute('''
+            SELECT id, role, name, email, phone, district, state, address, farm_size_acres, upi_id, cultivation_details, fleet_size, vehicle_types, pincode, preferred_payment
+            FROM users ORDER BY id DESC
+        ''')
+        users_rows = cursor.fetchall()
+        users = [{
+            "id": r[0], "role": r[1], "name": r[2], "email": r[3], "phone": r[4],
+            "district": r[5], "state": r[6], "address": r[7], "farm_size": r[8],
+            "upi_id": r[9], "cultivation_details": r[10], "fleet_size": r[11],
+            "vehicle_types": r[12], "pincode": r[13], "preferred_payment": r[14]
+        } for r in users_rows]
+
+        # Fetch all crops
+        cursor.execute('SELECT id, farmer_name, crop_name, quantity_kg, price_per_kg, fpo, location, harvest_date, publish_date, quality_grade, quality_score FROM crops ORDER BY id DESC')
+        crops_rows = cursor.fetchall()
+        crops = [{
+            "id": r[0], "farmer": r[1], "crop": r[2], "qty_kg": r[3], "price": r[4],
+            "fpo": r[5], "location": r[6], "harvest_date": r[7], "publish_date": r[8],
+            "quality_grade": r[9], "quality_score": r[10]
+        } for r in crops_rows]
+
+        # Fetch all orders with logistics tracking
+        cursor.execute('''
+            SELECT o.id, o.payment_id, c.crop_name, o.qty_kg, o.total_price, o.buyer_name, o.buyer_email, o.status, o.order_time,
+                   l.delivery_status, l.carrier_name, l.vehicle_number, l.driver_name, l.driver_phone
+            FROM orders o
+            JOIN crops c ON o.crop_id = c.id
+            LEFT JOIN logistics l ON o.id = l.order_id
+            ORDER BY o.id DESC
+        ''')
+        orders_rows = cursor.fetchall()
+        orders = [{
+            "id": r[0], "payment_id": r[1], "crop": r[2], "qty_kg": r[3], "total_price": r[4],
+            "buyer_name": r[5], "buyer_email": r[6], "status": r[7], "order_time": r[8],
+            "delivery_status": r[9] or "Unassigned", "carrier_name": r[10] or "Unassigned",
+            "vehicle_number": r[11] or "-", "driver_name": r[12] or "-", "driver_phone": r[13] or "-"
+        } for r in orders_rows]
+
+        conn.close()
+
+        return jsonify({
+            "status": "success",
+            "users": users,
+            "crops": crops,
+            "orders": orders
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/user/profile/<email>', methods=['GET'])
+def get_user_profile(email):
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT name, email, phone, role, farm_size_acres, district, state, upi_id, 
+                   details, address, pincode, cultivation_details, vehicle_types, fleet_size, preferred_payment
+            FROM users WHERE LOWER(email) = LOWER(?)
+        ''', (email.strip(),))
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            profile = {
+                "name": row[0], "email": row[1], "phone": row[2], "role": row[3],
+                "farm_size": row[4], "district": row[5], "state": row[6], "upi_id": row[7],
+                "fpo": row[8], "address": row[9], "pincode": row[10],
+                "cultivation_details": row[11], "vehicle_types": row[12],
+                "fleet_size": row[13], "preferred_payment": row[14]
+            }
+            return jsonify({"status": "success", "profile": profile})
+        return jsonify({"status": "error", "message": "Profile not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/user/profile/update', methods=['POST'])
+def update_user_profile():
+    try:
+        data = request.get_json() or {}
+        email = str(data.get('email', '')).strip().lower()
+
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            UPDATE users 
+            SET name = ?, phone = ?, farm_size_acres = ?, district = ?, state = ?, upi_id = ?, 
+                details = ?, address = ?, pincode = ?, cultivation_details = ?, vehicle_types = ?, 
+                fleet_size = ?, preferred_payment = ?, is_profile_complete = 1
+            WHERE LOWER(email) = ?
+        ''', (
+            data.get('name'), data.get('phone'), data.get('farm_size', 0), data.get('district', ''),
+            data.get('state', ''), data.get('upi_id', ''), data.get('fpo', ''), data.get('address', ''),
+            data.get('pincode', ''), data.get('cultivation_details', ''), data.get('vehicle_types', ''),
+            data.get('fleet_size', 1), data.get('preferred_payment', 'UPI'), email
+        ))
+
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "success", "message": "Profile updated successfully!"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # --- AI QUALITY CHECK & CROPS ROUTES ---
 @app.route('/api/ai/quality-check', methods=['POST'])
@@ -247,9 +347,9 @@ def add_crop():
     cursor.execute('SELECT role, name, is_profile_complete, district, state FROM users WHERE LOWER(email) = ?', (farmer_email,))
     user = cursor.fetchone()
     
-    if not user or user[0] != 'farmer' or user[2] == 0:
+    if not user or user[0] != 'farmer':
         conn.close()
-        return jsonify({"status": "error", "message": "Unauthorized or profile incomplete!"}), 403
+        return jsonify({"status": "error", "message": "Unauthorized! Only farmers can publish produce."}), 403
 
     today_publish_date = date.today().strftime("%Y-%m-%d")
     location = data.get('location') or f"{user[3]}, {user[4]}"
@@ -276,10 +376,15 @@ def delete_crop():
     cursor.execute('SELECT name, role FROM users WHERE LOWER(email) = ?', (farmer_email,))
     user = cursor.fetchone()
     
+    if not user:
+        conn.close()
+        return jsonify({"status": "error", "message": "User not found!"}), 404
+
     cursor.execute('SELECT farmer_name FROM crops WHERE id = ?', (crop_id,))
     crop = cursor.fetchone()
 
-    if not crop or crop[0].strip().lower() != user[0].strip().lower():
+    # Allow deletion if user is owner OR admin
+    if not crop or (user[1] != 'admin' and crop[0].strip().lower() != user[0].strip().lower()):
         conn.close()
         return jsonify({"status": "error", "message": "🔒 Access Denied! You can only delete your own listings."}), 403
 
@@ -298,7 +403,7 @@ def list_crops():
     crops = [{"id": r[0], "farmer": r[1], "crop": r[2], "qty_kg": r[3], "price": r[4], "fpo": r[5], "location": r[6], "harvest_date": r[7], "publish_date": r[8], "image": r[9], "quality_grade": r[10], "quality_score": r[11]} for r in rows]
     return jsonify({"crops": crops})
 
-# --- BUYER MATCHING & MULTI-FARMER SINGLE TRUCK ORDERS ---
+# --- BUYER MATCHING & ORDERS ---
 @app.route('/api/buyer/smart-match', methods=['POST'])
 def smart_match_requirement():
     data = request.get_json() or {}
@@ -407,7 +512,7 @@ def place_order():
     except Exception as e:
         return jsonify({"status": "error", "message": f"Purchase error: {str(e)}"}), 500
 
-# --- CONSOLIDATED LOGISTICS PORTAL APIS ---
+# --- LOGISTICS PORTAL APIS ---
 @app.route('/api/logistics/available-orders', methods=['GET'])
 def get_available_logistics_orders():
     try:
@@ -548,7 +653,6 @@ def update_logistics_progress():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# --- USER ORDERS HISTORY & TRACKING (SUPPORT FOR ALL ROLES) ---
 @app.route('/api/orders/user/<email>', methods=['GET'])
 def get_user_orders(email):
     try:
