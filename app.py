@@ -138,7 +138,6 @@ def register():
         role = str(data.get('role', 'buyer')).strip()
         phone = str(data.get('phone', '')).strip()
 
-        # Security check: Prevent registering as admin via standard registration form
         if role == 'admin':
             return jsonify({"status": "error", "message": "Unauthorized role selection!"}), 403
 
@@ -223,12 +222,13 @@ def get_admin_data():
             "quality_grade": r[9], "quality_score": r[10]
         } for r in crops_rows]
 
-        # Fetch all orders with logistics tracking
+        # Fetch all orders (Active & Past Completed via LEFT JOIN)
         cursor.execute('''
-            SELECT o.id, o.payment_id, c.crop_name, o.qty_kg, o.total_price, o.buyer_name, o.buyer_email, o.status, o.order_time,
+            SELECT o.id, o.payment_id, COALESCE(c.crop_name, 'Produce Item') as crop_name, 
+                   o.qty_kg, o.total_price, o.buyer_name, o.buyer_email, o.status, o.order_time,
                    l.delivery_status, l.carrier_name, l.vehicle_number, l.driver_name, l.driver_phone
             FROM orders o
-            JOIN crops c ON o.crop_id = c.id
+            LEFT JOIN crops c ON o.crop_id = c.id
             LEFT JOIN logistics l ON o.id = l.order_id
             ORDER BY o.id DESC
         ''')
@@ -236,7 +236,7 @@ def get_admin_data():
         orders = [{
             "id": r[0], "payment_id": r[1], "crop": r[2], "qty_kg": r[3], "total_price": r[4],
             "buyer_name": r[5], "buyer_email": r[6], "status": r[7], "order_time": r[8],
-            "delivery_status": r[9] or "Unassigned", "carrier_name": r[10] or "Unassigned",
+            "delivery_status": r[9] or "Order Placed", "carrier_name": r[10] or "Unassigned",
             "vehicle_number": r[11] or "-", "driver_name": r[12] or "-", "driver_phone": r[13] or "-"
         } for r in orders_rows]
 
@@ -383,7 +383,6 @@ def delete_crop():
     cursor.execute('SELECT farmer_name FROM crops WHERE id = ?', (crop_id,))
     crop = cursor.fetchone()
 
-    # Allow deletion if user is owner OR admin
     if not crop or (user[1] != 'admin' and crop[0].strip().lower() != user[0].strip().lower()):
         conn.close()
         return jsonify({"status": "error", "message": "🔒 Access Denied! You can only delete your own listings."}), 403
@@ -521,23 +520,22 @@ def get_available_logistics_orders():
         cursor.execute('''
             SELECT o.payment_id, 
                    GROUP_CONCAT(o.id) as order_ids,
-                   c.crop_name, 
+                   COALESCE(c.crop_name, 'Produce Order') as crop_name, 
                    SUM(o.qty_kg) as total_qty, 
                    o.buyer_name, 
                    o.status, 
-                   l.delivery_status, 
+                   COALESCE(l.delivery_status, 'Order Confirmed') as delivery_status, 
                    l.carrier_email, 
                    l.vehicle_number, 
                    l.driver_name, 
                    l.driver_phone, 
-                   l.route_distance_km, 
+                   COALESCE(l.route_distance_km, 0) as distance_km, 
                    l.multi_pickup_route, 
-                   l.est_fuel_cost, 
+                   COALESCE(l.est_fuel_cost, 0) as est_fuel_cost, 
                    l.vehicle_type
             FROM orders o
-            JOIN crops c ON o.crop_id = c.id
-            JOIN logistics l ON o.id = l.order_id
-            WHERE o.status != 'Cancelled & Refunded'
+            LEFT JOIN crops c ON o.crop_id = c.id
+            LEFT JOIN logistics l ON o.id = l.order_id
             GROUP BY o.payment_id
             ORDER BY MIN(o.id) DESC
         ''')
@@ -653,6 +651,7 @@ def update_logistics_progress():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# --- USER ORDERS HISTORY & TRACKING ---
 @app.route('/api/orders/user/<email>', methods=['GET'])
 def get_user_orders(email):
     try:
@@ -672,10 +671,12 @@ def get_user_orders(email):
 
         if role == 'farmer':
             cursor.execute('''
-                SELECT o.id, c.crop_name, o.qty_kg, o.total_price, o.buyer_name, o.buyer_email, o.payment_id, o.status, c.location, o.order_time,
-                       l.delivery_status, l.vehicle_number, l.driver_name, l.driver_phone, l.carrier_name, l.multi_pickup_route
+                SELECT o.id, COALESCE(c.crop_name, 'Produce Item') as crop_name, o.qty_kg, o.total_price, 
+                       o.buyer_name, o.buyer_email, o.payment_id, o.status, COALESCE(c.location, 'Farm Origin') as location, 
+                       o.order_time, l.delivery_status, l.vehicle_number, l.driver_name, l.driver_phone, 
+                       l.carrier_name, l.multi_pickup_route
                 FROM orders o
-                JOIN crops c ON o.crop_id = c.id
+                LEFT JOIN crops c ON o.crop_id = c.id
                 LEFT JOIN logistics l ON o.id = l.order_id
                 WHERE LOWER(c.farmer_name) = LOWER(?)
                 ORDER BY o.id DESC
@@ -700,7 +701,7 @@ def get_user_orders(email):
         elif role == 'logistics':
             cursor.execute('''
                 SELECT o.payment_id, 
-                       c.crop_name, 
+                       COALESCE(c.crop_name, 'Produce Order') as crop_name, 
                        SUM(o.qty_kg) as total_qty, 
                        SUM(o.total_price) as grand_total, 
                        GROUP_CONCAT(DISTINCT c.farmer_name) as farmer_names, 
@@ -715,7 +716,7 @@ def get_user_orders(email):
                        o.delivery_otp, 
                        l.multi_pickup_route
                 FROM orders o
-                JOIN crops c ON o.crop_id = c.id
+                LEFT JOIN crops c ON o.crop_id = c.id
                 JOIN logistics l ON o.id = l.order_id
                 WHERE LOWER(l.carrier_email) = LOWER(?)
                 GROUP BY o.payment_id
@@ -729,9 +730,9 @@ def get_user_orders(email):
                 "crop": r[1],
                 "qty_kg": r[2],
                 "total_price": r[3],
-                "farmer_name": r[4],
+                "farmer_name": r[4] or "Farmer Origin",
                 "status": r[5],
-                "location": r[6],
+                "location": r[6] or "Farm Location",
                 "order_time": r[7],
                 "can_cancel": False,
                 "minutes_left": 0,
@@ -749,7 +750,7 @@ def get_user_orders(email):
         else:
             cursor.execute('''
                 SELECT o.payment_id, 
-                       c.crop_name, 
+                       COALESCE(c.crop_name, 'Produce Order') as crop_name, 
                        SUM(o.qty_kg) as total_qty, 
                        SUM(o.total_price) as grand_total, 
                        GROUP_CONCAT(DISTINCT c.farmer_name) as farmer_names, 
@@ -764,7 +765,7 @@ def get_user_orders(email):
                        o.delivery_otp, 
                        l.multi_pickup_route
                 FROM orders o
-                JOIN crops c ON o.crop_id = c.id
+                LEFT JOIN crops c ON o.crop_id = c.id
                 LEFT JOIN logistics l ON o.id = l.order_id
                 WHERE LOWER(o.buyer_email) = LOWER(?)
                 GROUP BY o.payment_id
@@ -794,9 +795,9 @@ def get_user_orders(email):
                     "crop": r[1],
                     "qty_kg": r[2],
                     "total_price": r[3],
-                    "farmer_name": r[4],
+                    "farmer_name": r[4] or "Farmer Origin",
                     "status": r[5],
-                    "location": r[6],
+                    "location": r[6] or "Farm Location",
                     "order_time": r[7],
                     "can_cancel": can_cancel,
                     "minutes_left": minutes_left,

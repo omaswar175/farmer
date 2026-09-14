@@ -400,3 +400,91 @@ input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radiu
     color: #e65100;
     border: 1px solid #ff9800;
 }
+
+/* --- GLOBAL RESPONSIVE CONTAINER FIXES --- */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    overflow-x: hidden; /* Prevents horizontal scrolling on small screens */
+}
+
+.container {
+    width: 92%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 10px 0;
+}
+
+/* --- RESPONSIVE NAVIGATION BAR --- */
+@media (max-width: 992px) {
+    .navbar {
+        flex-direction: column;
+        gap: 12px;
+        padding: 15px;
+        text-align: center;
+    }
+    
+    .nav-links {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+    }
+}
+
+/* --- RESPONSIVE FORM ROWS & GRIDS --- */
+@media (max-width: 768px) {
+    /* Stack horizontal forms into vertical single columns on mobile */
+    .form-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .form-group {
+        width: 100%;
+    }
+
+    /* Adjust Marketplace Product Grid for Tablets/Mobile */
+    .product-grid {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+        gap: 15px;
+    }
+
+    /* Make modals fit properly on small phone screens */
+    .modal-content {
+        width: 90% !important;
+        max-width: 400px;
+        padding: 20px;
+        margin: 10% auto;
+    }
+
+    /* Table horizontal scrolling for small screens */
+    .orders-table-wrapper, #adminUsersTableContainer, #adminCropsTableContainer, #adminOrdersTableContainer, #carrierOrdersContainer {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .orders-table {
+        min-width: 600px; /* Ensures tables don't compress awkwardly */
+    }
+}
+
+@media (max-width: 480px) {
+    .hero-banner h1 {
+        font-size: 22px;
+    }
+
+    .hero-btns {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .btn-primary, .btn-outline {
+        width: 100%;
+    }
+}
