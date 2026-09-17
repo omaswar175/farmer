@@ -36,7 +36,7 @@
         <div class="hero-banner">
             <div class="hero-text">
                 <h1>Connecting Farmers Directly to Wholesale Buyers & Transport Carriers</h1>
-                <p>Eliminate middleman markups with AI quality checks & direct logistics dispatch.</p>
+                <p>Eliminate middleman markups with produce inspection videos, documentaries & direct logistics dispatch.</p>
                 <div class="hero-btns">
                     <button class="btn-primary" onclick="showTab('marketplace')">Browse Marketplace</button>
                     <button class="btn-outline" onclick="showTab('logistics')">🚛 Logistics Partner Portal</button>
@@ -114,7 +114,7 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Select Crop</label>
-                            <select id="fCrop" required onchange="resetQualityCheck()">
+                            <select id="fCrop" required>
                                 <option value="Potatoes">Potatoes</option>
                                 <option value="Tomatoes">Tomatoes</option>
                                 <option value="Onions">Onions</option>
@@ -149,22 +149,32 @@
                         </div>
                     </div>
 
+                    <!-- MEDIA UPLOADS -->
                     <div class="form-group ai-upload-box">
-                        <label><strong>📷 Upload Produce Photo for AI Quality Verification</strong></label>
-                        <input type="file" id="fCropImage" accept="image/*" required onchange="performAIQualityCheck(event)">
-                        
-                        <div id="aiQualityBox" class="ai-inspection-result" style="display: none;">
-                            <div class="ai-status-header">
-                                <span class="ai-badge">🤖 AI Quality Scan Result</span>
-                                <strong id="aiGradeText"></strong>
-                            </div>
-                            <p id="aiAnalysisDetail"></p>
-                            <img id="imagePreview" class="upload-preview-img" src="" alt="Crop Preview">
+                        <label><strong>📷 Upload Produce Photo*</strong></label>
+                        <input type="file" id="fCropImage" accept="image/*" required onchange="handleImageSelection(event)">
+                        <div id="imagePreviewContainer" style="display: none; margin-top: 10px;">
+                            <img id="imagePreview" class="upload-preview-img" src="" alt="Crop Photo Preview">
                         </div>
                     </div>
 
-                    <button type="submit" id="submitBtn" class="btn-primary full-btn" disabled style="opacity: 0.5; cursor: not-allowed;">
-                        🔒 Awaiting AI Quality Verification...
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label><strong>🎥 Field Video (Optional)</strong></label>
+                            <input type="url" id="fCropVideoUrl" placeholder="Paste YouTube / video link here" style="margin-bottom: 5px;">
+                            <small style="color:#666;">Or choose video file below:</small>
+                            <input type="file" id="fCropVideo" accept="video/*">
+                        </div>
+                        <div class="form-group">
+                            <label><strong>📄 Farm Documentary / PDF (Optional)</strong></label>
+                            <input type="url" id="fCropDocUrl" placeholder="Paste Drive / PDF link here" style="margin-bottom: 5px;">
+                            <small style="color:#666;">Or choose document file below:</small>
+                            <input type="file" id="fCropDoc" accept=".pdf,image/*">
+                        </div>
+                    </div>
+
+                    <button type="submit" id="submitBtn" class="btn-primary full-btn" style="margin-top: 15px; background-color: #2e7d32;">
+                        ✅ Quality Verified - Publish Produce Listing
                     </button>
                 </form>
             </div>
@@ -182,7 +192,7 @@
 
             <div id="logisticsMainDashboard" class="form-card" style="display: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-bottom: 20px;">
-                    <h2>🚛 AI Single-Truck Multi-Pickup Logistics Pool</h2>
+                    <h2>🚛 Single-Truck Multi-Pickup Logistics Pool</h2>
                     <button class="btn-outline" style="border-color: #2e7d32; color: #2e7d32;" onclick="loadLogisticsPortal()">🔄 Refresh Available Orders</button>
                 </div>
                 <p>Logged in Carrier: <strong id="carrierNameText"></strong> (<span id="carrierEmailText"></span>)</p>
@@ -266,7 +276,16 @@
         </div>
     </section>
 
-    <!-- AUTH MODAL (ADMIN EXCLUDED FROM REGISTRATION SELECTION AS SHOWN IN SCREENSHOT) -->
+    <!-- MEDIA PREVIEW MODAL -->
+    <div id="mediaModal" class="modal">
+        <div class="modal-content" style="width: 90%; max-width: 650px; text-align: center;">
+            <span class="close" onclick="closeModal('mediaModal')">&times;</span>
+            <h3 id="mediaModalTitle" style="color: #1b5e20; margin-top: 0;">Produce Media Inspection</h3>
+            <div id="mediaModalContainer" style="margin-top: 15px; min-height: 200px;"></div>
+        </div>
+    </div>
+
+    <!-- AUTH MODAL -->
     <div id="authModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('authModal')">&times;</span>
@@ -406,7 +425,6 @@
         let currentUser = JSON.parse(localStorage.getItem('agri_user')) || null;
         let activeProfileData = null;
         let isEditProfileMode = false;
-        let verifiedQualityData = null;
         let uploadedImageData = null;
         let currentAggregatedPool = null;
         let selectedSingleCrop = null;
@@ -474,6 +492,253 @@
             }
         }
 
+        // --- FILE HELPER (Converts File to Base64 Promise) ---
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                if (!file) return resolve('');
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        function handleImageSelection(event) {
+            const file = event.target.files[0];
+            if (file) {
+                fileToBase64(file).then(base64 => {
+                    uploadedImageData = base64;
+                    document.getElementById('imagePreview').src = uploadedImageData;
+                    document.getElementById('imagePreviewContainer').style.display = 'block';
+                });
+            }
+        }
+
+        async function handleCropAdd(e) {
+            e.preventDefault();
+            if (!currentUser || currentUser.role !== 'farmer') {
+                alert("Only logged in farmers can publish listings!");
+                return;
+            }
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.innerText = "⏳ Processing & Uploading...";
+            submitBtn.disabled = true;
+
+            try {
+                if (!uploadedImageData) {
+                    const imgFileInput = document.getElementById('fCropImage').files[0];
+                    if (imgFileInput) {
+                        uploadedImageData = await fileToBase64(imgFileInput);
+                    } else {
+                        alert("Please upload a produce photo!");
+                        submitBtn.innerText = "✅ Quality Verified - Publish Produce Listing";
+                        submitBtn.disabled = false;
+                        return;
+                    }
+                }
+
+                // Check link inputs first
+                const videoUrlInput = document.getElementById('fCropVideoUrl').value.trim();
+                const docUrlInput = document.getElementById('fCropDocUrl').value.trim();
+
+                // If no link, convert chosen files asynchronously
+                let finalVideo = videoUrlInput;
+                if (!finalVideo) {
+                    const videoFile = document.getElementById('fCropVideo').files[0];
+                    if (videoFile) {
+                        finalVideo = await fileToBase64(videoFile);
+                    }
+                }
+
+                let finalDoc = docUrlInput;
+                if (!finalDoc) {
+                    const docFile = document.getElementById('fCropDoc').files[0];
+                    if (docFile) {
+                        finalDoc = await fileToBase64(docFile);
+                    }
+                }
+
+                const payload = {
+                    farmer_email: currentUser.email,
+                    crop_name: document.getElementById('fCrop').value,
+                    quantity_kg: parseFloat(document.getElementById('fQty').value),
+                    price_per_kg: parseFloat(document.getElementById('fPrice').value),
+                    fpo: document.getElementById('fFPO').value || 'Independent',
+                    harvest_date: document.getElementById('fHarvestDate').value,
+                    location: document.getElementById('fLocation').value,
+                    image_data: uploadedImageData,
+                    video_data: finalVideo || '',
+                    doc_data: finalDoc || '',
+                    quality_grade: "Grade A (Premium)",
+                    quality_score: 95
+                };
+
+                const res = await fetch('/api/crops/add', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await res.json();
+                if (res.ok && data.status === "success") {
+                    alert("🎉 " + data.message);
+                    uploadedImageData = null;
+                    document.getElementById('fCropVideoUrl').value = '';
+                    document.getElementById('fCropDocUrl').value = '';
+                    document.getElementById('fCropVideo').value = '';
+                    document.getElementById('fCropDoc').value = '';
+                    document.getElementById('imagePreviewContainer').style.display = 'none';
+                    showTab('marketplace');
+                } else {
+                    alert("❌ " + data.message);
+                }
+            } catch (err) {
+                alert("Server error occurred while publishing.");
+            } finally {
+                submitBtn.innerText = "✅ Quality Verified - Publish Produce Listing";
+                submitBtn.disabled = false;
+            }
+        }
+
+        function openVideoModal(rawUrl) {
+            const videoUrl = decodeURIComponent(rawUrl);
+            const container = document.getElementById('mediaModalContainer');
+            document.getElementById('mediaModalTitle').innerText = "🎥 Produce Inspection Video";
+            
+            if (!videoUrl) {
+                container.innerHTML = `<p style="color: #c62828;">No video available for this produce listing.</p>`;
+                openModal('mediaModal');
+                return;
+            }
+
+            if (videoUrl.startsWith('data:video') || videoUrl.endsWith('.mp4') || videoUrl.endsWith('.webm') || videoUrl.endsWith('.ogg')) {
+                container.innerHTML = `
+                    <video controls autoplay style="width:100%; max-height:400px; border-radius:8px;">
+                        <source src="${videoUrl}">
+                        Your browser does not support playing this video.
+                    </video>`;
+            } 
+            else if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+                let embedUrl = videoUrl;
+                if (videoUrl.includes('watch?v=')) {
+                    const videoId = videoUrl.split('watch?v=')[1].split('&')[0];
+                    embedUrl = `https://www.youtube.com/embed/${videoId}`;
+                } else if (videoUrl.includes('youtu.be/')) {
+                    const videoId = videoUrl.split('youtu.be/')[1].split('?')[0];
+                    embedUrl = `https://www.youtube.com/embed/${videoId}`;
+                }
+
+                container.innerHTML = `
+                    <iframe src="${embedUrl}" 
+                            style="width:100%; height:380px; border:none; border-radius:8px;" 
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                            allowfullscreen>
+                    </iframe>`;
+            } 
+            else {
+                container.innerHTML = `
+                    <div style="padding:20px;">
+                        <p style="margin-bottom:15px; font-weight:600;">External Video Link Available:</p>
+                        <a href="${videoUrl}" target="_blank" class="btn-primary" style="text-decoration:none; display:inline-block;">
+                            🎥 Play Video in New Tab
+                        </a>
+                    </div>`;
+            }
+
+            openModal('mediaModal');
+        }
+
+        function openDocModal(rawUrl) {
+            const docUrl = decodeURIComponent(rawUrl);
+            const container = document.getElementById('mediaModalContainer');
+            document.getElementById('mediaModalTitle').innerText = "📄 Farm Documentary & Quality Certificate";
+            
+            if (!docUrl) {
+                container.innerHTML = `<p style="color: #c62828;">No documentary or certificate uploaded.</p>`;
+                openModal('mediaModal');
+                return;
+            }
+
+            if (docUrl.startsWith('data:image')) {
+                container.innerHTML = `<img src="${docUrl}" style="max-width:100%; max-height:400px; border-radius:8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">`;
+            } 
+            else if (docUrl.startsWith('data:application/pdf') || docUrl.endsWith('.pdf')) {
+                container.innerHTML = `<embed src="${docUrl}" type="application/pdf" width="100%" height="420px" style="border-radius:8px;" />`;
+            } 
+            else {
+                container.innerHTML = `
+                    <div style="padding:20px;">
+                        <p style="margin-bottom:15px; font-weight:600;">Document hosted externally:</p>
+                        <a href="${docUrl}" target="_blank" class="btn-primary" style="text-decoration:none; display:inline-block;">
+                            📄 Open Document in New Tab
+                        </a>
+                    </div>`;
+            }
+
+            openModal('mediaModal');
+        }
+
+        function renderMarketplaceCards(crops, isPooled = false) {
+            const grid = document.getElementById('productGrid');
+            if (!crops || crops.length === 0) {
+                grid.innerHTML = `<p>No listings found.</p>`;
+                return;
+            }
+
+            grid.innerHTML = crops.map(c => {
+                const isOwner = currentUser && (currentUser.role === 'farmer' || currentUser.role === 'admin') && 
+                                currentUser.name.trim().toLowerCase() === c.farmer.trim().toLowerCase();
+                
+                const cropJsonStr = JSON.stringify(c).replace(/"/g, '&quot;');
+
+                return `
+                    <div class="product-card">
+                        <img src="${c.image}" alt="${c.crop}">
+                        <div class="card-details">
+                            <span class="badge">${c.fpo}</span>
+                            <span class="badge ai-pass-badge">✓ Verified ${c.quality_grade}</span>
+                            <h3>${c.crop}</h3>
+                            <p class="farmer-tag">📍 ${c.location} | By ${c.farmer}</p>
+                            ${isPooled ? `<p style="color:#2e7d32; font-weight:bold; font-size:13px; margin:4px 0;">📦 Contributes: ${c.taken_kg} kg to order</p>` : ''}
+                            
+                            <div class="media-preview-btns">
+                                ${c.video ? `<button class="btn-media-view btn-video" onclick="openVideoModal('${encodeURIComponent(c.video)}')">🎥 Watch Video</button>` : ''}
+                                ${c.doc ? `<button class="btn-media-view btn-doc" onclick="openDocModal('${encodeURIComponent(c.doc)}')">📄 View Doc</button>` : ''}
+                            </div>
+
+                            <div class="meta-dates">
+                                <small>🌾 Harvested: ${c.harvest_date}</small><br>
+                                <small>📅 Published: ${c.publish_date}</small>
+                            </div>
+                            <div class="card-footer">
+                                <span class="price">₹${c.price} <small>/ kg</small></span>
+                                <span class="stock">${c.stock_kg || c.qty_kg} kg stock</span>
+                            </div>
+
+                            ${!isOwner ? `
+                                <button class="btn-buy-direct" onclick='openSingleBuyModal(${cropJsonStr})'>
+                                    ⚡ Buy Direct
+                                </button>
+                            ` : `
+                                <button class="btn-delete-listing" onclick="deleteCropListing(${c.id})">
+                                    🗑️ Delete My Listing
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadMarketplace() {
+            document.getElementById('poolingSummaryBox').style.display = 'none';
+            currentAggregatedPool = null;
+            const res = await fetch('/api/crops/list');
+            const data = await res.json();
+            renderMarketplaceCards(data.crops, false);
+        }
+
         // --- ADMIN DASHBOARD ENGINE ---
         async function loadAdminDashboardData() {
             if (!currentUser || currentUser.role !== 'admin') return;
@@ -489,7 +754,6 @@
                 const data = await res.json();
 
                 if (res.ok && data.status === "success") {
-                    // Render Users Table
                     uCont.innerHTML = `
                         <table class="orders-table">
                             <thead>
@@ -525,7 +789,6 @@
                         </table>
                     `;
 
-                    // Render Crops Table
                     cCont.innerHTML = `
                         <table class="orders-table">
                             <thead>
@@ -535,7 +798,7 @@
                                     <th>Farmer</th>
                                     <th>Qty Available</th>
                                     <th>Price</th>
-                                    <th>Quality Score</th>
+                                    <th>Quality Grade</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -547,7 +810,7 @@
                                         <td>${c.farmer} (${c.location})</td>
                                         <td>${c.qty_kg} kg</td>
                                         <td class="price-text">₹${c.price}/kg</td>
-                                        <td><span class="badge ai-pass-badge">${c.quality_grade} (${c.quality_score}%)</span></td>
+                                        <td><span class="badge ai-pass-badge">${c.quality_grade}</span></td>
                                         <td>
                                             <button class="btn-delete-listing" onclick="deleteCropListing(${c.id})">🗑️ Remove Listing</button>
                                         </td>
@@ -557,7 +820,6 @@
                         </table>
                     `;
 
-                    // Render Orders Table
                     oCont.innerHTML = `
                         <table class="orders-table">
                             <thead>
@@ -612,7 +874,7 @@
             }
         }
 
-        // --- ROLE-SPECIFIC PROFILE VIEW & EDIT ENGINE ---
+        // --- PROFILE ENGINE ---
         async function loadUserProfile() {
             if (!currentUser) return;
             const container = document.getElementById('profileDynamicFieldsContainer');
@@ -671,10 +933,6 @@
                     <div class="form-group">
                         <label>Land & Cultivation Crop Details</label>
                         <textarea id="profCultivation" style="width:100%; height:60px;" ${disabledAttr}>${p.cultivation_details || ''}</textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Identity / Aadhaar Verification Status</label>
-                        <input type="text" value="[Aadhaar Redacted] - Verified" disabled readonly style="background:#e8f5e9; color:#2e7d32; font-weight:bold;">
                     </div>
                 `;
             } else if (role === 'buyer') {
@@ -1378,60 +1636,6 @@
             }
         }
 
-        function renderMarketplaceCards(crops, isPooled = false) {
-            const grid = document.getElementById('productGrid');
-            if (!crops || crops.length === 0) {
-                grid.innerHTML = `<p>No listings found.</p>`;
-                return;
-            }
-
-            grid.innerHTML = crops.map(c => {
-                const isOwner = currentUser && (currentUser.role === 'farmer' || currentUser.role === 'admin') && 
-                                currentUser.name.trim().toLowerCase() === c.farmer.trim().toLowerCase();
-                
-                const cropJsonStr = JSON.stringify(c).replace(/"/g, '&quot;');
-
-                return `
-                    <div class="product-card">
-                        <img src="${c.image}" alt="${c.crop}">
-                        <div class="card-details">
-                            <span class="badge">${c.fpo}</span>
-                            <span class="badge ai-pass-badge">✓ AI Passed: ${c.quality_grade}</span>
-                            <h3>${c.crop}</h3>
-                            <p class="farmer-tag">📍 ${c.location} | By ${c.farmer}</p>
-                            ${isPooled ? `<p style="color:#2e7d32; font-weight:bold; font-size:13px; margin:4px 0;">📦 Contributes: ${c.taken_kg} kg to order</p>` : ''}
-                            <div class="meta-dates">
-                                <small>🌾 Harvested: ${c.harvest_date}</small><br>
-                                <small>📅 Published: ${c.publish_date}</small>
-                            </div>
-                            <div class="card-footer">
-                                <span class="price">₹${c.price} <small>/ kg</small></span>
-                                <span class="stock">${c.stock_kg || c.qty_kg} kg stock</span>
-                            </div>
-
-                            ${!isOwner ? `
-                                <button class="btn-buy-direct" onclick='openSingleBuyModal(${cropJsonStr})'>
-                                    ⚡ Buy Direct
-                                </button>
-                            ` : `
-                                <button class="btn-delete-listing" onclick="deleteCropListing(${c.id})">
-                                    🗑️ Delete My Listing
-                                </button>
-                            `}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        async function loadMarketplace() {
-            document.getElementById('poolingSummaryBox').style.display = 'none';
-            currentAggregatedPool = null;
-            const res = await fetch('/api/crops/list');
-            const data = await res.json();
-            renderMarketplaceCards(data.crops, false);
-        }
-
         function showTab(tabId) {
             document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'));
             document.getElementById(`tab-${tabId}`).classList.add('active');
@@ -1533,118 +1737,6 @@
             localStorage.removeItem('agri_user');
             updateUIState();
             showTab('home');
-        }
-
-        async function performAIQualityCheck(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const submitBtn = document.getElementById('submitBtn');
-            submitBtn.innerText = "⏳ AI Scanning Crop & Verifying Match...";
-            submitBtn.style.opacity = "0.5";
-            submitBtn.style.cursor = "not-allowed";
-            submitBtn.disabled = true;
-
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                uploadedImageData = e.target.result;
-                document.getElementById('imagePreview').src = uploadedImageData;
-
-                const selectedCrop = document.getElementById('fCrop').value;
-                
-                const res = await fetch('/api/ai/quality-check', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        crop_name: selectedCrop,
-                        filename: file.name
-                    })
-                });
-                
-                const data = await res.json();
-                const box = document.getElementById('aiQualityBox');
-                box.style.display = 'block';
-
-                if (data.status === "mismatch") {
-                    verifiedQualityData = null;
-                    box.className = "ai-inspection-result ai-error-box";
-                    document.getElementById('aiGradeText').innerText = "❌ Crop Verification Failed";
-                    document.getElementById('aiAnalysisDetail').innerText = data.message;
-
-                    submitBtn.disabled = true;
-                    submitBtn.style.opacity = "0.5";
-                    submitBtn.style.cursor = "not-allowed";
-                    submitBtn.innerText = "🚫 Crop Mismatch / Unrelated Image - Cannot Publish Listing";
-                    submitBtn.style.backgroundColor = "#d32f2f";
-                } else {
-                    verifiedQualityData = data;
-                    box.className = "ai-inspection-result ai-success-box";
-                    document.getElementById('aiGradeText').innerText = `${data.quality_grade} (${data.quality_score}% Freshness Score)`;
-                    document.getElementById('aiAnalysisDetail').innerText = data.analysis;
-
-                    submitBtn.disabled = false;
-                    submitBtn.style.opacity = "1";
-                    submitBtn.style.cursor = "pointer";
-                    submitBtn.innerText = "✅ Quality Verified - Publish Produce Listing";
-                    submitBtn.style.backgroundColor = "#2e7d32";
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function resetQualityCheck() {
-            verifiedQualityData = null;
-            document.getElementById('aiQualityBox').style.display = 'none';
-            const submitBtn = document.getElementById('submitBtn');
-            submitBtn.disabled = true;
-            submitBtn.style.opacity = "0.5";
-            submitBtn.style.cursor = "not-allowed";
-            submitBtn.innerText = "🔒 Awaiting AI Quality Verification...";
-            submitBtn.style.backgroundColor = "#2e7d32";
-        }
-
-        async function handleCropAdd(e) {
-            e.preventDefault();
-            if (!currentUser || currentUser.role !== 'farmer') {
-                alert("Only logged in farmers can publish listings!");
-                return;
-            }
-            if (!verifiedQualityData) {
-                alert("Please upload produce photo for AI Quality Verification first!");
-                return;
-            }
-
-            const payload = {
-                farmer_email: currentUser.email,
-                crop_name: document.getElementById('fCrop').value,
-                quantity_kg: parseFloat(document.getElementById('fQty').value),
-                price_per_kg: parseFloat(document.getElementById('fPrice').value),
-                fpo: document.getElementById('fFPO').value || 'Independent',
-                harvest_date: document.getElementById('fHarvestDate').value,
-                location: document.getElementById('fLocation').value,
-                image_data: uploadedImageData,
-                quality_grade: verifiedQualityData.quality_grade,
-                quality_score: verifiedQualityData.quality_score
-            };
-
-            try {
-                const res = await fetch('/api/crops/add', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(payload)
-                });
-                
-                const data = await res.json();
-                if (res.ok && data.status === "success") {
-                    alert("🎉 " + data.message);
-                    resetQualityCheck();
-                    showTab('marketplace');
-                } else {
-                    alert("❌ " + data.message);
-                }
-            } catch (err) {
-                alert("Server error occurred while publishing.");
-            }
         }
 
         updateUIState();

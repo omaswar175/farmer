@@ -111,6 +111,41 @@ body {
 .price { font-size: 1.3rem; font-weight: bold; color: var(--primary); }
 .full-btn { width: 100%; }
 
+/* MEDIA PREVIEW BUTTONS ON MARKETPLACE CARDS */
+.media-preview-btns {
+    display: flex;
+    gap: 8px;
+    margin: 8px 0;
+}
+.btn-media-view {
+    flex: 1;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 4px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+}
+.btn-video {
+    background: #e3f2fd;
+    color: #1565c0;
+    border: 1px solid #90caf9;
+}
+.btn-video:hover {
+    background: #1565c0;
+    color: white;
+}
+.btn-doc {
+    background: #fff3e0;
+    color: #e65100;
+    border: 1px solid #ffe0b2;
+}
+.btn-doc:hover {
+    background: #e65100;
+    color: white;
+}
+
 .btn-buy-direct {
     width: 100%;
     margin-top: 10px;
@@ -155,7 +190,7 @@ body {
 .form-group label { display: block; margin-bottom: 5px; font-weight: 600; }
 .form-row { display: flex; gap: 15px; }
 .form-row .form-group { flex: 1; }
-input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
 
 .ai-upload-box {
     background: #f8f9fa;
@@ -194,7 +229,6 @@ input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radiu
     font-size: 12px;
     font-weight: bold;
 }
-.ai-error-box .ai-badge { background: #d32f2f !important; }
 .upload-preview-img {
     max-height: 180px;
     width: 100%;
@@ -242,23 +276,13 @@ input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radiu
     color: #c62828;
     border: 1px solid #ef5350;
 }
-.btn-cancel-order {
+.status-badge.orange {
     background: #fff3e0;
     color: #e65100;
     border: 1px solid #ff9800;
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-weight: bold;
-    cursor: pointer;
-    font-size: 12px;
-    transition: all 0.2s ease;
-}
-.btn-cancel-order:hover {
-    background: #e65100;
-    color: white;
 }
 
-.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
 .modal-content { background: white; padding: 30px; border-radius: 8px; width: 350px; position: relative; }
 .close { position: absolute; right: 15px; top: 10px; font-size: 24px; cursor: pointer; }
 .modal-tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
@@ -266,30 +290,6 @@ input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radiu
 .modal-tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
 .user-badge { color: var(--gold); font-weight: bold; margin-right: 15px; }
 .text-center { text-align: center; }
-
-/* WORKFLOW STEPPER BAR FOR LOGISTICS PORTAL */
-.workflow-stepper {
-    display: flex;
-    justify-content: space-between;
-    background: #e8f5e9;
-    padding: 12px;
-    border-radius: 8px;
-    margin-bottom: 25px;
-    border: 1px solid #c8e6c9;
-}
-.workflow-stepper .step {
-    flex: 1;
-    text-align: center;
-    font-size: 12px;
-    font-weight: bold;
-    color: #2e7d32;
-    position: relative;
-    padding: 4px;
-}
-.workflow-stepper .step.active {
-    color: #1b5e20;
-    border-bottom: 2px solid #1b5e20;
-}
 
 /* BUYER LIVE LOGISTICS TRACKING STEPPER */
 .tracking-stepper {
@@ -340,151 +340,12 @@ input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radiu
 .t-step.active .t-label {
     color: #1b5e20;
 }
-.status-badge.orange {
-    background: #fff3e0;
-    color: #e65100;
-    border: 1px solid #ff9800;
-}
 
-/* WORKFLOW & LOGISTICS STYLES */
-.tracking-stepper {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin: 15px 0;
-    position: relative;
-}
-.tracking-stepper::before {
-    content: '';
-    position: absolute;
-    top: 15px;
-    left: 10%;
-    right: 10%;
-    height: 3px;
-    background: #e0e0e0;
-    z-index: 1;
-}
-.t-step {
-    position: relative;
-    z-index: 2;
-    text-align: center;
-    flex: 1;
-}
-.t-circle {
-    width: 32px;
-    height: 32px;
-    background: #e0e0e0;
-    color: #666;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 6px auto;
-    font-weight: bold;
-    font-size: 14px;
-}
-.t-step.active .t-circle {
-    background: #1b5e20;
-    color: white;
-}
-.t-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: #666;
-}
-.t-step.active .t-label {
-    color: #1b5e20;
-}
-.status-badge.orange {
-    background: #fff3e0;
-    color: #e65100;
-    border: 1px solid #ff9800;
-}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 0; width: 100%; overflow-x: hidden; }
+.container { width: 92%; max-width: 1200px; margin: 0 auto; padding: 10px 0; }
 
-/* --- GLOBAL RESPONSIVE CONTAINER FIXES --- */
-* {
-    box-sizing: border-box;
-}
-
-body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    overflow-x: hidden; /* Prevents horizontal scrolling on small screens */
-}
-
-.container {
-    width: 92%;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 10px 0;
-}
-
-/* --- RESPONSIVE NAVIGATION BAR --- */
-@media (max-width: 992px) {
-    .navbar {
-        flex-direction: column;
-        gap: 12px;
-        padding: 15px;
-        text-align: center;
-    }
-    
-    .nav-links {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 10px;
-    }
-}
-
-/* --- RESPONSIVE FORM ROWS & GRIDS --- */
 @media (max-width: 768px) {
-    /* Stack horizontal forms into vertical single columns on mobile */
-    .form-row {
-        flex-direction: column;
-        gap: 10px;
-    }
-
-    .form-group {
-        width: 100%;
-    }
-
-    /* Adjust Marketplace Product Grid for Tablets/Mobile */
-    .product-grid {
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
-        gap: 15px;
-    }
-
-    /* Make modals fit properly on small phone screens */
-    .modal-content {
-        width: 90% !important;
-        max-width: 400px;
-        padding: 20px;
-        margin: 10% auto;
-    }
-
-    /* Table horizontal scrolling for small screens */
-    .orders-table-wrapper, #adminUsersTableContainer, #adminCropsTableContainer, #adminOrdersTableContainer, #carrierOrdersContainer {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .orders-table {
-        min-width: 600px; /* Ensures tables don't compress awkwardly */
-    }
-}
-
-@media (max-width: 480px) {
-    .hero-banner h1 {
-        font-size: 22px;
-    }
-
-    .hero-btns {
-        flex-direction: column;
-        gap: 10px;
-    }
-
-    .btn-primary, .btn-outline {
-        width: 100%;
-    }
+    .form-row { flex-direction: column; gap: 10px; }
+    .product-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important; }
 }
