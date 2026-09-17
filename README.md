@@ -14,3 +14,5 @@ pip freeze > requirements.txt
 
 # Any time you reopen Codespaces or set up a new environment, just run:
 pip install -r requirements.txt
+
+==> Available at your primary URL https://agrilink-app-mofe.onrender.com
